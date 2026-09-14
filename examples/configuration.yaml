@@ -1,0 +1,14 @@
+# Minimal snippet — merge into your configuration.yaml
+
+homeassistant:
+  packages: !include_dir_named packages
+
+# Optional YAML dashboard (adjust filename/path as needed):
+# lovelace:
+#   dashboards:
+#     heating-strategy:
+#       mode: yaml
+#       title: Heating strategy
+#       icon: mdi:home-thermometer
+#       filename: dashboards/heizung.yaml
+#       show_in_sidebar: true

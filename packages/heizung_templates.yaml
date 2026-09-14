@@ -1,0 +1,749 @@
+# Heating templates (package)
+# Needs climate/ETA/PV entities from your stack. See ENTITY_MAP.md.
+
+template:
+  - binary_sensor:
+      - name: Heizung Wochenende
+        unique_id: heizung_wochenende
+        default_entity_id: binary_sensor.heizung_wochenende
+        icon: mdi:calendar-weekend
+        state: "{{ now().isoweekday() >= 6 or is_state('input_boolean.heizung_feiertag', 'on') }}"
+      - name: Heizung aktiv
+        unique_id: heizung_aktiv
+        default_entity_id: binary_sensor.heizung_aktiv
+        icon: mdi:home-thermometer
+        state: "{{ states('input_select.heizung_modus') in ['Übergang', 'Winter'] }}"
+      - name: Heizung Fenster Wohnen roh
+        unique_id: heizung_fenster_wohnen_roh
+        default_entity_id: binary_sensor.heizung_fenster_wohnen_roh
+        device_class: window
+        state: "{{ is_state('binary_sensor.wohnzimmer_wohnzimmer_fenster', 'on') or is_state('binary_sensor.ture_terrasse_contact', 'on') }}"
+      - name: Heizung Fenster Büro roh
+        unique_id: heizung_fenster_buero_roh
+        default_entity_id: binary_sensor.heizung_fenster_buero_roh
+        device_class: window
+        state: "{{ is_state('binary_sensor.fenster_buro_contact', 'on') or is_state('binary_sensor.dachfenster_buro_contact', 'on') }}"
+      - name: Heizung Fenster Bad roh
+        unique_id: heizung_fenster_bad_roh
+        default_entity_id: binary_sensor.heizung_fenster_bad_roh
+        device_class: window
+        state: "{{ is_state('binary_sensor.fenster_bad_contact', 'on') or is_state('binary_sensor.bad_bad_fenster', 'on') }}"
+      - name: Heizung Fenster Spielzimmer roh
+        unique_id: heizung_fenster_spiel_roh
+        default_entity_id: binary_sensor.heizung_fenster_spiel_roh
+        device_class: window
+        state: "{{ is_state('binary_sensor.spielzimmer_spielzimmer_fenster', 'on') }}"
+      - name: Heizung Fenster Schlafen B roh
+        unique_id: heizung_fenster_schlafen_b_roh
+        default_entity_id: binary_sensor.heizung_fenster_schlafen_b_roh
+        device_class: window
+        state: "{{ is_state('binary_sensor.schlafzimmer_schlafzimmer_fenster', 'on') }}"
+      - name: Heizung Fenster Schlafen C roh
+        unique_id: heizung_fenster_schlafen_c_roh
+        default_entity_id: binary_sensor.heizung_fenster_schlafen_c_roh
+        device_class: window
+        state: "{{ is_state('binary_sensor.fenster_schlafen_c_contact', 'on') or is_state('binary_sensor.schlafen_c_fenster', 'on') }}"
+      - name: Heizung Fenster relevant offen
+        unique_id: heizung_fenster_relevant_offen
+        default_entity_id: binary_sensor.heizung_fenster_relevant_offen
+        device_class: window
+        state: >-
+          {{ is_state('binary_sensor.heizung_fenster_wohnen_roh', 'on')
+             or is_state('binary_sensor.heizung_fenster_buero_roh', 'on')
+             or is_state('binary_sensor.heizung_fenster_bad_roh', 'on')
+             or is_state('binary_sensor.heizung_fenster_spiel_roh', 'on')
+             or is_state('binary_sensor.heizung_fenster_schlafen_b_roh', 'on')
+             or is_state('binary_sensor.heizung_fenster_schlafen_c_roh', 'on') }}
+      - name: Heizung Sperre Wohnen
+        unique_id: bs_heizung_sperre_wohnen
+        default_entity_id: binary_sensor.heizung_sperre_wohnen
+        icon: mdi:timer-pause
+        state: "{{ not is_state('timer.heizung_sperre_wohnen', 'idle') or is_state('input_boolean.heizung_fenster_wohnen_ok', 'on') }}"
+      - name: Heizung Sperre Büro
+        unique_id: bs_heizung_sperre_buero
+        default_entity_id: binary_sensor.heizung_sperre_buero
+        icon: mdi:timer-pause
+        state: "{{ not is_state('timer.heizung_sperre_buero', 'idle') or is_state('input_boolean.heizung_fenster_buero_ok', 'on') }}"
+      - name: Heizung Sperre Bad
+        unique_id: bs_heizung_sperre_bad
+        default_entity_id: binary_sensor.heizung_sperre_bad
+        icon: mdi:timer-pause
+        state: "{{ not is_state('timer.heizung_sperre_bad', 'idle') or is_state('input_boolean.heizung_fenster_bad_ok', 'on') }}"
+      - name: Heizung Sperre Spielzimmer
+        unique_id: bs_heizung_sperre_spielzimmer
+        default_entity_id: binary_sensor.heizung_sperre_spielzimmer
+        icon: mdi:timer-pause
+        state: "{{ not is_state('timer.heizung_sperre_spielzimmer', 'idle') or is_state('input_boolean.heizung_fenster_spiel_ok', 'on') }}"
+      - name: Heizung Sperre Schlafen B
+        unique_id: bs_heizung_sperre_schlafen_b
+        default_entity_id: binary_sensor.heizung_sperre_schlafen_b
+        icon: mdi:timer-pause
+        state: "{{ not is_state('timer.heizung_sperre_schlafen_b', 'idle') or is_state('input_boolean.heizung_fenster_schlafen_b_ok', 'on') }}"
+      - name: Heizung Sperre Schlafen C
+        unique_id: bs_heizung_sperre_schlafen_c
+        default_entity_id: binary_sensor.heizung_sperre_schlafen_c
+        icon: mdi:timer-pause
+        state: "{{ not is_state('timer.heizung_sperre_schlafen_c', 'idle') or is_state('input_boolean.heizung_fenster_schlafen_c_ok', 'on') }}"
+      - name: Heizung Schlafen Nacht
+        unique_id: heizung_schlafen_nacht
+        default_entity_id: binary_sensor.heizung_schlafen_nacht
+        icon: mdi:weather-night
+        state: >-
+          {% set n = now().strftime('%H:%M:%S') %}
+          {% set d = not (n >= states('input_datetime.heizung_schlafen_a_start') and n < states('input_datetime.heizung_schlafen_a_ende')) %}
+          {% set s = not (n >= states('input_datetime.heizung_schlafen_b_start') and n < states('input_datetime.heizung_schlafen_b_ende')) %}
+          {% set t = not (n >= states('input_datetime.heizung_schlafen_c_start') and n < states('input_datetime.heizung_schlafen_c_ende')) %}
+          {{ d or s or t }}
+      - name: Heizung Außen kalt roh
+        unique_id: heizung_aussen_kalt_roh
+        default_entity_id: binary_sensor.heizung_aussen_kalt_roh
+        icon: mdi:snowflake
+        state: >-
+          {{ states('sensor.heizkreis_eingange_aussentemperatur') | float(99) <
+             states('input_number.heizung_nacht_aussen_c') | float(2) }}
+      - name: Heizung Schlafraum kalt roh
+        unique_id: heizung_schlafraum_kalt_roh
+        default_entity_id: binary_sensor.heizung_schlafraum_kalt_roh
+        icon: mdi:bed
+        state: >-
+          {% set lim = states('input_number.heizung_nacht_raum_c') | float(16) %}
+          {% set t1 = state_attr('climate.schlafen_a', 'current_temperature') | float(99) %}
+          {% set t2 = state_attr('climate.schlafen_b', 'current_temperature') | float(99) %}
+          {% set t3 = state_attr('climate.schlafen_c', 'current_temperature') | float(99) %}
+          {{ t1 < lim or t2 < lim or t3 < lim }}
+      - name: Heizung kalte Nacht Schlafen
+        unique_id: heizung_kalte_nacht_schlafen
+        default_entity_id: binary_sensor.heizung_kalte_nacht_schlafen
+        icon: mdi:snowflake-thermometer
+        state: >-
+          {{ is_state('binary_sensor.heizung_aktiv', 'on')
+             and is_state('binary_sensor.heizung_schlafen_nacht', 'on')
+             and is_state('binary_sensor.heizung_fenster_relevant_offen', 'off')
+             and (is_state('input_boolean.heizung_aussen_kalt_ok', 'on')
+                  or is_state('input_boolean.heizung_schlafraum_kalt_ok', 'on')) }}
+      - name: Heizung kalte Nacht Wohnen
+        unique_id: heizung_kalte_nacht_wohnen
+        default_entity_id: binary_sensor.heizung_kalte_nacht_wohnen
+        icon: mdi:sofa
+        state: >-
+          {{ is_state('binary_sensor.heizung_aktiv', 'on')
+             and is_state('input_boolean.heizung_aussen_kalt_ok', 'on')
+             and states('sensor.heizung_soll_wohnen_plan') == 'off' }}
+      - name: Heizung hydraulisch Bedarf
+        unique_id: heizung_hydraulisch_bedarf
+        default_entity_id: binary_sensor.heizung_hydraulisch_bedarf
+        icon: mdi:pipe
+        state: >-
+          {% set halten = states('input_number.heizung_tado_halten_c') | float(17) %}
+          {% set bad_s = states('sensor.heizung_soll_bad') %}
+          {% set spiel_s = states('sensor.heizung_soll_spielzimmer') %}
+          {% set bad_need = bad_s != 'off' and (state_attr('climate.bad', 'current_temperature') | float(99) < bad_s | float(20)) %}
+          {% set spiel_need = spiel_s != 'off' and (state_attr('climate.spielzimmer', 'current_temperature') | float(99) < spiel_s | float(20)) %}
+          {% set nacht = is_state('binary_sensor.heizung_kalte_nacht_schlafen', 'on') %}
+          {% set schlafen_b_need = nacht and states('sensor.heizung_soll_schlafen_b') == 'off' and (state_attr('climate.schlafzimmer', 'current_temperature') | float(99) < halten) %}
+          {% set schlafen_c_need = nacht and states('sensor.heizung_soll_schlafen_c') == 'off' and (state_attr('climate.schlafen_c_tado', 'current_temperature') | float(99) < halten) %}
+          {{ bad_need or spiel_need or schlafen_b_need or schlafen_c_need }}
+      - name: Heizung Puffer reicht
+        unique_id: heizung_puffer_reicht
+        default_entity_id: binary_sensor.heizung_puffer_reicht
+        icon: mdi:water-check
+        state: >-
+          {{ states('sensor.pufferflex_eingange_fuhler_1_oben') | float(0) >=
+             states('input_number.heizung_eta_puffer_min_c') | float(45) }}
+
+      - name: Heizung Away aktiv
+        unique_id: heizung_away_aktiv
+        default_entity_id: binary_sensor.heizung_away_aktiv
+        icon: mdi:home-export-outline
+        state: >-
+          {% set modus = states('input_select.heizung_away') %}
+          {% if modus == 'Home' %}false
+          {% elif modus == 'Away' %}true
+          {% else %}
+            {{ not (is_state('person.person_a', 'home')
+                    or is_state('person.person_b', 'home')
+                    or is_state('person.person_c', 'home')) }}
+          {% endif %}
+      - name: Heizung Away Büro aktiv
+        unique_id: heizung_away_buero_aktiv
+        default_entity_id: binary_sensor.heizung_away_buero_aktiv
+        icon: mdi:desk
+        state: >-
+          {% set modus = states('input_select.heizung_away_buero') %}
+          {% if modus == 'Home' %}false
+          {% elif modus == 'Away' %}true
+          {% else %}{{ not is_state('person.person_a', 'home') }}
+          {% endif %}
+
+      - name: Heizung Klima wenig Wohnen
+        unique_id: bs_heizung_klima_wenig_wohnen
+        default_entity_id: binary_sensor.heizung_klima_wenig_wohnen
+        icon: mdi:flash-off
+        state: >-
+          {{ states('sensor.schlafraume_erdgeschoss_klima_schlafen_phase_a_leistung') | float(999)
+             < states('input_number.heizung_klima_idle_w') | float(50) }}
+      - name: Heizung Klima wenig Schlafen
+        unique_id: bs_heizung_klima_wenig_schlafen
+        default_entity_id: binary_sensor.heizung_klima_wenig_schlafen
+        icon: mdi:flash-off
+        state: >-
+          {{ states('sensor.uv_schupfen_uv_schupfen_terasse_phase_c_leistung') | float(999)
+             < states('input_number.heizung_klima_idle_w') | float(50) }}
+      - name: Heizung Klima wenig Büro
+        unique_id: bs_heizung_klima_wenig_buero
+        default_entity_id: binary_sensor.heizung_klima_wenig_buero
+        icon: mdi:flash-off
+        state: >-
+          {{ states('sensor.faikin_power_consumption') | float(999)
+             < states('input_number.heizung_klima_idle_w') | float(50)
+             and states('sensor.faikin_comp') | float(99) | abs < 1 }}
+
+  - sensor:
+      - name: Heizung Soll Wohnen Plan
+        unique_id: heizung_soll_wohnen_plan
+        default_entity_id: sensor.heizung_soll_wohnen_plan
+        icon: mdi:sofa
+        state: >-
+          {% set n = now().strftime('%H:%M:%S') %}
+          {% set we = is_state('binary_sensor.heizung_wochenende', 'on') %}
+          {% if we %}
+            {% set a = states('input_datetime.heizung_wohnen_we_start') %}
+            {% set b = states('input_datetime.heizung_wohnen_we_ende') %}
+            {% if n >= a and n < b %}{{ states('input_number.heizung_wohnen_boost_c') | float }}
+            {% else %}off{% endif %}
+          {% else %}
+            {% set a = states('input_datetime.heizung_wohnen_wt_boost_start') %}
+            {% set b = states('input_datetime.heizung_wohnen_wt_boost_ende') %}
+            {% set c = states('input_datetime.heizung_wohnen_wt_aus') %}
+            {% if n >= a and n < b %}{{ states('input_number.heizung_wohnen_boost_c') | float }}
+            {% elif n >= b and n < c %}{{ states('input_number.heizung_wohnen_tag_c') | float }}
+            {% else %}off{% endif %}
+          {% endif %}
+      - name: Heizung Soll Wohnen
+        unique_id: heizung_soll_wohnen
+        default_entity_id: sensor.heizung_soll_wohnen
+        icon: mdi:sofa
+        state: >-
+          {% set plan = states('sensor.heizung_soll_wohnen_plan') %}
+          {% set effektiv = plan if plan != 'off' else (states('input_number.heizung_wohnen_nacht_c') | float if is_state('binary_sensor.heizung_kalte_nacht_wohnen', 'on') else 'off') %}
+          {% if effektiv != 'off' and is_state('binary_sensor.heizung_away_aktiv', 'on') %}
+            {% set effektiv = states('input_number.heizung_away_c') | float(18) %}
+          {% endif %}
+          {% set boost = states('input_number.schimmel_heizen_c') | float(22) %}
+          {% if is_state('binary_sensor.schimmel_heizen_aktiv_wohnen', 'on') %}
+            {{ boost if effektiv == 'off' else [effektiv | float(0), boost] | max }}
+          {% else %}{{ effektiv }}{% endif %}
+      - name: Heizung Soll Büro
+        unique_id: heizung_soll_buero
+        default_entity_id: sensor.heizung_soll_buero
+        icon: mdi:desk
+        state: >-
+          {% set n = now().strftime('%H:%M:%S') %}
+          {% set we = is_state('binary_sensor.heizung_wochenende', 'on') %}
+          {% set mo = now().isoweekday() == 1 and not we %}
+          {% if mo %}
+            {% set a = states('input_datetime.heizung_buero_mo_frueh_start') %}
+            {% set b = states('input_datetime.heizung_buero_mo_frueh_ende') %}
+            {% set c = states('input_datetime.heizung_buero_mo_abend_start') %}
+            {% set d = states('input_datetime.heizung_buero_mo_abend_ende') %}
+            {% set plan = states('input_number.heizung_buero_c') | float if ((n >= a and n < b) or (n >= c and n < d)) else 'off' %}
+          {% else %}
+            {% set a = states('input_datetime.heizung_buero_rest_start') %}
+            {% set b = states('input_datetime.heizung_buero_rest_ende') %}
+            {% set plan = states('input_number.heizung_buero_c') | float if (n >= a and n < b) else 'off' %}
+          {% endif %}
+          {% if plan != 'off' and is_state('binary_sensor.heizung_away_buero_aktiv', 'on') %}
+            {% set plan = states('input_number.heizung_away_c') | float(18) %}
+          {% endif %}
+          {% set boost = states('input_number.schimmel_heizen_c') | float(22) %}
+          {% if is_state('binary_sensor.schimmel_heizen_aktiv_buero', 'on') %}
+            {{ boost if plan == 'off' else [plan | float(0), boost] | max }}
+          {% else %}{{ plan }}{% endif %}
+      - name: Heizung Soll Schlafen A
+        unique_id: heizung_soll_schlafen_a
+        default_entity_id: sensor.heizung_soll_schlafen_a
+        icon: mdi:bed
+        state: >-
+          {% set n = now().strftime('%H:%M:%S') %}
+          {% set a = states('input_datetime.heizung_schlafen_a_start') %}
+          {% set b = states('input_datetime.heizung_schlafen_a_ende') %}
+          {% set plan = states('input_number.heizung_schlafen_a_c') | float if (n >= a and n < b) else 'off' %}
+          {% if plan != 'off' and is_state('binary_sensor.heizung_away_aktiv', 'on') %}{{ states('input_number.heizung_away_c') | float(18) }}
+          {% else %}{{ plan }}{% endif %}
+      - name: Heizung Soll Schlafen B
+        unique_id: heizung_soll_schlafen_b
+        default_entity_id: sensor.heizung_soll_schlafen_b
+        icon: mdi:bed
+        state: >-
+          {% set n = now().strftime('%H:%M:%S') %}
+          {% set a = states('input_datetime.heizung_schlafen_b_start') %}
+          {% set b = states('input_datetime.heizung_schlafen_b_ende') %}
+          {% set plan = states('input_number.heizung_schlafen_b_c') | float if (n >= a and n < b) else 'off' %}
+          {% if plan != 'off' and is_state('binary_sensor.heizung_away_aktiv', 'on') %}
+            {% set plan = states('input_number.heizung_away_c') | float(18) %}
+          {% endif %}
+          {% set boost = states('input_number.schimmel_heizen_c') | float(22) %}
+          {% if is_state('binary_sensor.schimmel_heizen_aktiv_schlafzimmer', 'on') %}
+            {{ boost if plan == 'off' else [plan | float(0), boost] | max }}
+          {% else %}{{ plan }}{% endif %}
+      - name: Heizung Soll Schlafen C
+        unique_id: heizung_soll_schlafen_c
+        default_entity_id: sensor.heizung_soll_schlafen_c
+        icon: mdi:bed
+        state: >-
+          {% set n = now().strftime('%H:%M:%S') %}
+          {% set a = states('input_datetime.heizung_schlafen_c_start') %}
+          {% set b = states('input_datetime.heizung_schlafen_c_ende') %}
+          {% set plan = states('input_number.heizung_schlafen_c_c') | float if (n >= a and n < b) else 'off' %}
+          {% if plan != 'off' and is_state('binary_sensor.heizung_away_aktiv', 'on') %}
+            {% set plan = states('input_number.heizung_away_c') | float(18) %}
+          {% endif %}
+          {% set boost = states('input_number.schimmel_heizen_c') | float(22) %}
+          {% if is_state('binary_sensor.schimmel_heizen_aktiv_schlafen_c', 'on') %}
+            {{ boost if plan == 'off' else [plan | float(0), boost] | max }}
+          {% else %}{{ plan }}{% endif %}
+      - name: Heizung Soll Bad
+        unique_id: heizung_soll_bad
+        default_entity_id: sensor.heizung_soll_bad
+        icon: mdi:shower
+        state: >-
+          {% set n = now().strftime('%H:%M:%S') %}
+          {% set we = is_state('binary_sensor.heizung_wochenende', 'on') %}
+          {% if we %}
+            {% set a = states('input_datetime.heizung_bad_we_start') %}
+            {% set b = states('input_datetime.heizung_bad_we_ende') %}
+            {% set plan = states('input_number.heizung_bad_we_c') | float if (n >= a and n < b) else 'off' %}
+          {% else %}
+            {% set a = states('input_datetime.heizung_bad_morgens_start') %}
+            {% set b = states('input_datetime.heizung_bad_morgens_ende') %}
+            {% set c = states('input_datetime.heizung_bad_abends_start') %}
+            {% set d = states('input_datetime.heizung_bad_abends_ende') %}
+            {% set plan = states('input_number.heizung_bad_c') | float if ((n >= a and n < b) or (n >= c and n < d)) else 'off' %}
+          {% endif %}
+          {% if plan != 'off' and is_state('binary_sensor.heizung_away_aktiv', 'on') %}{{ states('input_number.heizung_away_c') | float(18) }}
+          {% else %}{{ plan }}{% endif %}
+      - name: Heizung Soll Spielzimmer
+        unique_id: heizung_soll_spielzimmer
+        default_entity_id: sensor.heizung_soll_spielzimmer
+        icon: mdi:teddy-bear
+        state: >-
+          {% set n = now().strftime('%H:%M:%S') %}
+          {% set we = is_state('binary_sensor.heizung_wochenende', 'on') %}
+          {% if we %}
+            {% set a = states('input_datetime.heizung_spiel_we_start') %}
+            {% set b = states('input_datetime.heizung_spiel_we_ende') %}
+          {% else %}
+            {% set a = states('input_datetime.heizung_spiel_wt_start') %}
+            {% set b = states('input_datetime.heizung_spiel_wt_ende') %}
+          {% endif %}
+          {% set plan = states('input_number.heizung_spiel_c') | float if (n >= a and n < b) else 'off' %}
+          {% if plan != 'off' and is_state('binary_sensor.heizung_away_aktiv', 'on') %}{{ states('input_number.heizung_away_c') | float(18) }}
+          {% else %}{{ plan }}{% endif %}
+      - name: Heizung Status
+        unique_id: heizung_status
+        default_entity_id: sensor.heizung_status
+        icon: mdi:information
+        state: "{{ states('input_select.heizung_modus') }}"
+        attributes:
+          wohnen: "{{ states('sensor.heizung_soll_wohnen') }}"
+          buero: "{{ states('sensor.heizung_soll_buero') }}"
+          schlafen_a: "{{ states('sensor.heizung_soll_schlafen_a') }}"
+          schlafen_b: "{{ states('sensor.heizung_soll_schlafen_b') }}"
+          schlafen_c: "{{ states('sensor.heizung_soll_schlafen_c') }}"
+          bad: "{{ states('sensor.heizung_soll_bad') }}"
+          spielzimmer: "{{ states('sensor.heizung_soll_spielzimmer') }}"
+          kalte_nacht_schlafen: "{{ states('binary_sensor.heizung_kalte_nacht_schlafen') }}"
+          eta_mindestlauf: "{{ states('timer.heizung_eta_mindestlauf') }}"
+          puffer_oben: "{{ states('sensor.pufferflex_eingange_fuhler_1_oben') }}"
+          aussen: "{{ states('sensor.heizkreis_eingange_aussentemperatur') }}"
+          solcast_heute: "{{ states('sensor.solcast_pv_forecast_prognose_heute') }}"
+          maestro_netz_24h: "{{ states('sensor.e3dc_maestro_forecast_netzbezug_nachste_24h') }}"
+          soc: "{{ states('sensor.e3dc_battery_state_of_charge') }}"
+          dwd_nachttiefst: "{{ states('sensor.heizung_dwd_nachttiefst') }}"
+          away: "{{ states('binary_sensor.heizung_away_aktiv') }}"
+          away_buero: "{{ states('binary_sensor.heizung_away_buero_aktiv') }}"
+          schimmel_buero: "{{ states('binary_sensor.schimmel_heizen_aktiv_buero') }}"
+          schimmel_wohnen: "{{ states('binary_sensor.schimmel_heizen_aktiv_wohnen') }}"
+          schimmel_schlafzimmer: "{{ states('binary_sensor.schimmel_heizen_aktiv_schlafzimmer') }}"
+          schimmel_schlafen_c: "{{ states('binary_sensor.schimmel_heizen_aktiv_schlafen_c') }}"
+
+  - trigger:
+      - trigger: time_pattern
+        minutes: "/15"
+      - trigger: homeassistant
+        event: start
+      - trigger: event
+        event_type: event_template_reloaded
+      - trigger: state
+        entity_id: weather.kuemmersbruck
+    action:
+      - action: weather.get_forecasts
+        target:
+          entity_id: weather.kuemmersbruck
+        data:
+          type: hourly
+        response_variable: dwd_fc
+    sensor:
+      - name: Heizung DWD Nachttiefst
+        unique_id: heizung_dwd_nachttiefst
+        default_entity_id: sensor.heizung_dwd_nachttiefst
+        device_class: temperature
+        unit_of_measurement: "°C"
+        state_class: measurement
+        icon: mdi:thermometer-chevron-down
+        availability: "{{ states('weather.kuemmersbruck') not in ['unknown', 'unavailable'] }}"
+        state: >-
+          {% set items = dwd_fc['weather.kuemmersbruck'].get('forecast', []) if dwd_fc is mapping else [] %}
+          {% if now() < today_at('08:00') %}
+            {% set start = now() %}
+            {% set end = today_at('08:00') %}
+          {% else %}
+            {% set start = today_at('18:00') %}
+            {% set end = today_at('08:00') + timedelta(days=1) %}
+            {% if now() > start %}
+              {% set start = now() %}
+            {% endif %}
+          {% endif %}
+          {% set ns = namespace(temps=[]) %}
+          {% for item in items %}
+            {% set t = as_datetime(item.datetime) %}
+            {% if t is not none %}
+              {% if t.tzinfo is none %}
+                {% set t = t.replace(tzinfo=now().tzinfo) %}
+              {% endif %}
+              {% if t >= start and t <= end and item.temperature is number %}
+                {% set ns.temps = ns.temps + [item.temperature] %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          {% if ns.temps %}{{ ns.temps | min }}{% endif %}
+        attributes:
+          fenster_start: "18:00"
+          fenster_ende: "08:00"
+    binary_sensor:
+      - name: Heizung DWD kalte Nacht
+        unique_id: heizung_dwd_kalte_nacht
+        default_entity_id: binary_sensor.heizung_dwd_kalte_nacht
+        icon: mdi:weather-snowy
+        availability: "{{ is_number(states('sensor.heizung_dwd_nachttiefst')) }}"
+        state: >-
+          {{ states('sensor.heizung_dwd_nachttiefst') | float(99) <
+             states('input_number.heizung_nacht_aussen_c') | float(2) }}
+      - name: Heizung DWD Puffer vorbereiten
+        unique_id: heizung_dwd_puffer_vorbereitung
+        default_entity_id: binary_sensor.heizung_dwd_puffer_vorbereitung
+        icon: mdi:water-boiler
+        state: >-
+          {% set vorlauf = states('input_number.heizung_eta_mindestlauf_min') | int(90) %}
+          {% set kalt = is_state('binary_sensor.heizung_dwd_kalte_nacht', 'on') %}
+          {% set aktiv = is_state('binary_sensor.heizung_aktiv', 'on') %}
+          {% set fenster_ok = is_state('binary_sensor.heizung_fenster_relevant_offen', 'off') %}
+          {% if now() < today_at('08:00') %}
+            {% set zeit = true %}
+          {% else %}
+            {% set zeit = now() >= (today_at('18:00') - timedelta(minutes=vorlauf)) %}
+          {% endif %}
+          {{ aktiv and kalt and fenster_ok and zeit }}
+  - binary_sensor:
+      - name: Heizung Restwärme reicht
+        unique_id: heizung_restwaerme_reicht
+        default_entity_id: binary_sensor.heizung_restwaerme_reicht
+        icon: mdi:water-check
+        availability: "{{ states('sensor.heizung_puffer_prognose') not in ['unknown', 'unavailable'] }}"
+        state: "{{ states('sensor.heizung_puffer_prognose') in ['reicht', 'knapp'] }}"
+
+  - sensor:
+      - name: Heizung Puffer Energie WW
+        unique_id: heizung_puffer_energie_ww
+        default_entity_id: sensor.heizung_puffer_energie_ww
+        unit_of_measurement: kWh
+        state_class: measurement
+        icon: mdi:water-thermometer
+        availability: >-
+          {{ is_number(states('sensor.pufferflex_eingange_fuhler_1_oben'))
+             and is_number(states('sensor.pufferflex_eingange_fuhler_2'))
+             and is_number(states('sensor.pufferflex_eingange_fuhler_3')) }}
+        state: >-
+          {% set tmin = states('input_number.heizung_eta_puffer_min_c') | float(45) %}
+          {% set m = 825 / 3 %}
+          {% set cp = 1.163 %}
+          {% set t1 = states('sensor.pufferflex_eingange_fuhler_1_oben') | float(0) %}
+          {% set t2 = states('sensor.pufferflex_eingange_fuhler_2') | float(0) %}
+          {% set t3 = states('sensor.pufferflex_eingange_fuhler_3') | float(0) %}
+          {{ ((([t1 - tmin, 0] | max) + ([t2 - tmin, 0] | max) + ([t3 - tmin, 0] | max)) * m * cp / 1000) | round(2) }}
+      - name: Heizung Puffer Energie Heizen
+        unique_id: heizung_puffer_energie_heizen
+        default_entity_id: sensor.heizung_puffer_energie_heizen
+        unit_of_measurement: kWh
+        state_class: measurement
+        icon: mdi:radiator
+        availability: >-
+          {{ is_number(states('sensor.pufferflex_eingange_fuhler_1_oben'))
+             and is_number(states('sensor.pufferflex_eingange_fuhler_2'))
+             and is_number(states('sensor.pufferflex_eingange_fuhler_3')) }}
+        state: >-
+          {% set tmin = 30.0 %}
+          {% set m = 825 / 3 %}
+          {% set cp = 1.163 %}
+          {% set t1 = states('sensor.pufferflex_eingange_fuhler_1_oben') | float(0) %}
+          {% set t2 = states('sensor.pufferflex_eingange_fuhler_2') | float(0) %}
+          {% set t3 = states('sensor.pufferflex_eingange_fuhler_3') | float(0) %}
+          {{ ((([t1 - tmin, 0] | max) + ([t2 - tmin, 0] | max) + ([t3 - tmin, 0] | max)) * m * cp / 1000) | round(2) }}
+
+  - trigger:
+      - trigger: time_pattern
+        minutes: "/15"
+      - trigger: homeassistant
+        event: start
+      - trigger: event
+        event_type: event_template_reloaded
+      - trigger: state
+        entity_id:
+          - sensor.pufferflex_eingange_fuhler_1_oben
+          - sensor.solcast_pv_forecast_prognose_heute
+          - sensor.e3dc_maestro_forecast_soc_trajektorie_24h
+    sensor:
+      - name: Heizung Puffer Prognose
+        unique_id: heizung_puffer_prognose
+        default_entity_id: sensor.heizung_puffer_prognose
+        icon: mdi:chart-timeline-variant
+        availability: >-
+          {{ is_number(states('sensor.pufferflex_eingange_fuhler_1_oben'))
+             and is_number(states('sensor.pufferflex_eingange_fuhler_2'))
+             and is_number(states('sensor.pufferflex_eingange_fuhler_3')) }}
+        state: >-
+          {% set tmin = states('input_number.heizung_eta_puffer_min_c') | float(45) %}
+          {% set m = 825.0 / 3.0 %}
+          {% set cp = 1.163 %}
+          {% set dt_h = 0.5 %}
+          {% set ww_tag = states('input_number.heizung_ww_liter_tag') | float(80) * cp * (tmin - 10.0) / 1000.0 %}
+          {% set hk_kw = states('input_number.heizung_heizkreis_kw') | float(2) %}
+          {% set haus_kw = [[states('sensor.e3dc_berechneter_hausverbrauch_wallbox_elwa') | float(1000) / 1000.0, 0.5] | max, 2.5] | min %}
+          {% set ventile_zu = is_state('input_boolean.heizung_ventile_zu', 'on') %}
+          {% set heiz_aus = states('input_select.heizung_modus') in ['Aus', 'Manuell'] %}
+          {% set fc = (state_attr('sensor.solcast_pv_forecast_prognose_heute', 'detailedForecast') or [])
+                    + (state_attr('sensor.solcast_pv_forecast_prognose_morgen', 'detailedForecast') or []) %}
+          {% set pts = state_attr('sensor.e3dc_maestro_forecast_soc_trajektorie_24h', 'trajectory_points') or [] %}
+          {% set ns = namespace(
+            t1=states('sensor.pufferflex_eingange_fuhler_1_oben') | float(0),
+            t2=states('sensor.pufferflex_eingange_fuhler_2') | float(0),
+            t3=states('sensor.pufferflex_eingange_fuhler_3') | float(0),
+            e1=states('sensor.pufferflex_eingange_fuhler_1_oben') | float(0),
+            e2=states('sensor.pufferflex_eingange_fuhler_2') | float(0),
+            e3=states('sensor.pufferflex_eingange_fuhler_3') | float(0),
+            soc=states('sensor.e3dc_battery_state_of_charge') | float(0),
+            pv=0.0, socn=0.0, ohne=none, mit=none) %}
+          {% for i in range(48) %}
+            {% set ts = now() + timedelta(minutes=i * 30) %}
+            {% set n = ts.strftime('%H:%M:%S') %}
+            {% set we = ts.isoweekday() >= 6 or is_state('input_boolean.heizung_feiertag', 'on') %}
+            {% set ww_kw = (ww_tag * 0.7) / 3.0 if n >= '06:00:00' and n < '09:00:00' else ((ww_tag * 0.3) / 3.0 if n >= '18:00:00' and n < '21:00:00' else 0.0) %}
+            {% if we %}
+              {% set hyd = (n >= states('input_datetime.heizung_bad_we_start') and n < states('input_datetime.heizung_bad_we_ende'))
+                        or (n >= states('input_datetime.heizung_spiel_we_start') and n < states('input_datetime.heizung_spiel_we_ende')) %}
+            {% else %}
+              {% set hyd = (n >= states('input_datetime.heizung_bad_morgens_start') and n < states('input_datetime.heizung_bad_morgens_ende'))
+                        or (n >= states('input_datetime.heizung_bad_abends_start') and n < states('input_datetime.heizung_bad_abends_ende'))
+                        or (n >= states('input_datetime.heizung_spiel_wt_start') and n < states('input_datetime.heizung_spiel_wt_ende')) %}
+            {% endif %}
+            {% set hyd_kw = hk_kw if hyd and not ventile_zu and not heiz_aus and is_state('binary_sensor.heizung_hydraulisch_bedarf', 'on') else 0.0 %}
+            {% set ns.pv = 0.0 %}
+            {% for p in fc %}
+              {% set ps = as_datetime(p.period_start) %}
+              {% if ps is not none %}
+                {% if ps.tzinfo is none %}{% set ps = ps.replace(tzinfo=now().tzinfo) %}{% endif %}
+                {% if ts >= ps and ts < ps + timedelta(minutes=30) %}{% set ns.pv = p.pv_estimate | float(0) %}{% endif %}
+              {% endif %}
+            {% endfor %}
+            {% set ms = ts.timestamp() * 1000 %}
+            {% set ns.socn = ns.soc %}
+            {% for p in pts %}
+              {% if p[0] <= ms %}{% set ns.socn = p[1] | float(0) %}{% endif %}
+            {% endfor %}
+            {% set bat_kw = (ns.socn - ns.soc) / 100.0 * 15.0 / dt_h %}
+            {% set surplus = [ns.pv - haus_kw - ([bat_kw, 0] | max), 0] | max %}
+            {% set cap = m * cp %}
+            {% set q = (ww_kw + hyd_kw + 0.08) * dt_h * 1000.0 %}
+            {% set d1 = [q / cap, ns.t1 - 20] | min %}{% set ns.t1 = ns.t1 - d1 %}{% set q = q - d1 * cap %}
+            {% set d2 = [q / cap, ns.t2 - 20] | min %}{% set ns.t2 = ns.t2 - d2 %}{% set q = q - d2 * cap %}
+            {% set d3 = [q / cap, ns.t3 - 20] | min %}{% set ns.t3 = ns.t3 - d3 %}
+            {% set qe = (ww_kw + hyd_kw + 0.08) * dt_h * 1000.0 %}
+            {% set de1 = [qe / cap, ns.e1 - 20] | min %}{% set ns.e1 = ns.e1 - de1 %}{% set qe = qe - de1 * cap %}
+            {% set de2 = [qe / cap, ns.e2 - 20] | min %}{% set ns.e2 = ns.e2 - de2 %}{% set qe = qe - de2 * cap %}
+            {% set de3 = [qe / cap, ns.e3 - 20] | min %}{% set ns.e3 = ns.e3 - de3 %}
+            {% set elwa_ziel = states('input_number.heizung_elwa_ziel_c') | float(80) %}
+            {% set elwa = [surplus, 3.5] | min if ns.e2 < elwa_ziel else 0.0 %}
+            {% set dT = elwa * dt_h * 1000.0 / cap %}
+            {% set ns.e2 = [ns.e2 + dT * 0.70, elwa_ziel] | min %}
+            {% set ns.e1 = [ns.e1 + dT * 0.20, elwa_ziel] | min %}
+            {% set ns.e3 = ns.e3 + dT * 0.10 %}
+            {% if ns.t1 < tmin and ns.ohne is none %}{% set ns.ohne = i * dt_h %}{% endif %}
+            {% if ns.e1 < tmin and ns.mit is none %}{% set ns.mit = i * dt_h %}{% endif %}
+            {% set ns.soc = ns.socn %}
+          {% endfor %}
+          {% set h_ohne = ns.ohne if ns.ohne is not none else 24 %}
+          {% set h_mit = ns.mit if ns.mit is not none else 24 %}
+          {% if h_ohne >= 18 %}reicht{% elif h_ohne >= 8 or h_mit >= 12 %}knapp{% else %}fehlt{% endif %}
+        attributes:
+          hinweis: >-
+            {% set tmin = states('input_number.heizung_eta_puffer_min_c') | float(45) %}
+            {% set m = 825.0 / 3.0 %}
+            {% set cp = 1.163 %}
+            {% set dt_h = 0.5 %}
+            {% set ww_tag = states('input_number.heizung_ww_liter_tag') | float(80) * cp * (tmin - 10.0) / 1000.0 %}
+            {% set hk_kw = states('input_number.heizung_heizkreis_kw') | float(2) %}
+            {% set haus_kw = [[states('sensor.e3dc_berechneter_hausverbrauch_wallbox_elwa') | float(1000) / 1000.0, 0.5] | max, 2.5] | min %}
+            {% set ventile_zu = is_state('input_boolean.heizung_ventile_zu', 'on') %}
+            {% set heiz_aus = states('input_select.heizung_modus') in ['Aus', 'Manuell'] %}
+            {% set fc = (state_attr('sensor.solcast_pv_forecast_prognose_heute', 'detailedForecast') or [])
+                      + (state_attr('sensor.solcast_pv_forecast_prognose_morgen', 'detailedForecast') or []) %}
+            {% set pts = state_attr('sensor.e3dc_maestro_forecast_soc_trajektorie_24h', 'trajectory_points') or [] %}
+            {% set ns = namespace(
+              t1=states('sensor.pufferflex_eingange_fuhler_1_oben') | float(0),
+              t2=states('sensor.pufferflex_eingange_fuhler_2') | float(0),
+              t3=states('sensor.pufferflex_eingange_fuhler_3') | float(0),
+              e1=states('sensor.pufferflex_eingange_fuhler_1_oben') | float(0),
+              e2=states('sensor.pufferflex_eingange_fuhler_2') | float(0),
+              e3=states('sensor.pufferflex_eingange_fuhler_3') | float(0),
+              soc=states('sensor.e3dc_battery_state_of_charge') | float(0),
+              pv=0.0, socn=0.0, ohne=none, mit=none, surplus_i=none,
+              ts=[], top_ohne=[], top_mit=[], pvs=[], sur=[], socs=[]) %}
+            {% for i in range(48) %}
+              {% set ts = now() + timedelta(minutes=i * 30) %}
+              {% set n = ts.strftime('%H:%M:%S') %}
+              {% set we = ts.isoweekday() >= 6 or is_state('input_boolean.heizung_feiertag', 'on') %}
+              {% set ww_kw = (ww_tag * 0.7) / 3.0 if n >= '06:00:00' and n < '09:00:00' else ((ww_tag * 0.3) / 3.0 if n >= '18:00:00' and n < '21:00:00' else 0.0) %}
+              {% if we %}
+                {% set hyd = (n >= states('input_datetime.heizung_bad_we_start') and n < states('input_datetime.heizung_bad_we_ende'))
+                          or (n >= states('input_datetime.heizung_spiel_we_start') and n < states('input_datetime.heizung_spiel_we_ende')) %}
+              {% else %}
+                {% set hyd = (n >= states('input_datetime.heizung_bad_morgens_start') and n < states('input_datetime.heizung_bad_morgens_ende'))
+                          or (n >= states('input_datetime.heizung_bad_abends_start') and n < states('input_datetime.heizung_bad_abends_ende'))
+                          or (n >= states('input_datetime.heizung_spiel_wt_start') and n < states('input_datetime.heizung_spiel_wt_ende')) %}
+              {% endif %}
+              {% set hyd_kw = hk_kw if hyd and not ventile_zu and not heiz_aus and is_state('binary_sensor.heizung_hydraulisch_bedarf', 'on') else 0.0 %}
+              {% set ns.pv = 0.0 %}
+              {% for p in fc %}
+                {% set ps = as_datetime(p.period_start) %}
+                {% if ps is not none %}
+                  {% if ps.tzinfo is none %}{% set ps = ps.replace(tzinfo=now().tzinfo) %}{% endif %}
+                  {% if ts >= ps and ts < ps + timedelta(minutes=30) %}{% set ns.pv = p.pv_estimate | float(0) %}{% endif %}
+                {% endif %}
+              {% endfor %}
+              {% set ms = ts.timestamp() * 1000 %}
+              {% set ns.socn = ns.soc %}
+              {% for p in pts %}
+                {% if p[0] <= ms %}{% set ns.socn = p[1] | float(0) %}{% endif %}
+              {% endfor %}
+              {% set bat_kw = (ns.socn - ns.soc) / 100.0 * 15.0 / dt_h %}
+              {% set surplus = [ns.pv - haus_kw - ([bat_kw, 0] | max), 0] | max %}
+              {% if surplus > 0.4 and ns.surplus_i is none %}{% set ns.surplus_i = i %}{% endif %}
+              {% set cap = m * cp %}
+              {% set q = (ww_kw + hyd_kw + 0.08) * dt_h * 1000.0 %}
+              {% set d1 = [q / cap, ns.t1 - 20] | min %}{% set ns.t1 = ns.t1 - d1 %}{% set q = q - d1 * cap %}
+              {% set d2 = [q / cap, ns.t2 - 20] | min %}{% set ns.t2 = ns.t2 - d2 %}{% set q = q - d2 * cap %}
+              {% set d3 = [q / cap, ns.t3 - 20] | min %}{% set ns.t3 = ns.t3 - d3 %}
+              {% set qe = (ww_kw + hyd_kw + 0.08) * dt_h * 1000.0 %}
+              {% set de1 = [qe / cap, ns.e1 - 20] | min %}{% set ns.e1 = ns.e1 - de1 %}{% set qe = qe - de1 * cap %}
+              {% set de2 = [qe / cap, ns.e2 - 20] | min %}{% set ns.e2 = ns.e2 - de2 %}{% set qe = qe - de2 * cap %}
+              {% set de3 = [qe / cap, ns.e3 - 20] | min %}{% set ns.e3 = ns.e3 - de3 %}
+              {% set elwa_ziel = states('input_number.heizung_elwa_ziel_c') | float(80) %}
+              {% set elwa = [surplus, 3.5] | min if ns.e2 < elwa_ziel else 0.0 %}
+              {% set dT = elwa * dt_h * 1000.0 / cap %}
+              {% set ns.e2 = [ns.e2 + dT * 0.70, elwa_ziel] | min %}
+              {% set ns.e1 = [ns.e1 + dT * 0.20, elwa_ziel] | min %}
+              {% set ns.e3 = ns.e3 + dT * 0.10 %}
+              {% if ns.t1 < tmin and ns.ohne is none %}{% set ns.ohne = i * dt_h %}{% endif %}
+              {% if ns.e1 < tmin and ns.mit is none %}{% set ns.mit = i * dt_h %}{% endif %}
+              {% set ns.ts = ns.ts + [(ts.timestamp() * 1000) | int] %}
+              {% set ns.top_ohne = ns.top_ohne + [(ns.t1 * 10) | round(0) / 10] %}
+              {% set ns.top_mit = ns.top_mit + [(ns.e1 * 10) | round(0) / 10] %}
+              {% set ns.pvs = ns.pvs + [(ns.pv * 10) | round(0) / 10] %}
+              {% set ns.sur = ns.sur + [(surplus * 10) | round(0) / 10] %}
+              {% set ns.socs = ns.socs + [(ns.socn * 10) | round(0) / 10] %}
+              {% set ns.soc = ns.socn %}
+            {% endfor %}
+            {% set h_ohne = ns.ohne if ns.ohne is not none else 24 %}
+            {% set h_mit = ns.mit if ns.mit is not none else 24 %}
+            {% set clock_ohne = (now() + timedelta(hours=h_ohne)).strftime('%H:%M') %}
+            {% set clock_sur = (now() + timedelta(minutes=ns.surplus_i * 30)).strftime('%H:%M') if ns.surplus_i is not none else 'nicht in 24 h' %}
+            {% if h_ohne >= 24 %}
+              Ohne Heizstab bleibt Puffer oben voraussichtlich 24 h über {{ tmin | int }} °C. PV-Überschuss für die ELWA (openWB) ab {{ clock_sur }}.
+            {% else %}
+              Ohne Stab fällt Puffer oben um {{ clock_ohne }} unter {{ tmin | int }} °C (in {{ h_ohne }} h). Mit Überschuss-ELWA {{ h_mit }} h über der Schwelle. PV-Überschuss ab {{ clock_sur }}. openWB bleibt der Regler.
+            {% endif %}
+          kurve: >-
+            {% set tmin = states('input_number.heizung_eta_puffer_min_c') | float(45) %}
+            {% set m = 825.0 / 3.0 %}
+            {% set cp = 1.163 %}
+            {% set dt_h = 0.5 %}
+            {% set ww_tag = states('input_number.heizung_ww_liter_tag') | float(80) * cp * (tmin - 10.0) / 1000.0 %}
+            {% set hk_kw = states('input_number.heizung_heizkreis_kw') | float(2) %}
+            {% set haus_kw = [[states('sensor.e3dc_berechneter_hausverbrauch_wallbox_elwa') | float(1000) / 1000.0, 0.5] | max, 2.5] | min %}
+            {% set ventile_zu = is_state('input_boolean.heizung_ventile_zu', 'on') %}
+            {% set heiz_aus = states('input_select.heizung_modus') in ['Aus', 'Manuell'] %}
+            {% set fc = (state_attr('sensor.solcast_pv_forecast_prognose_heute', 'detailedForecast') or [])
+                      + (state_attr('sensor.solcast_pv_forecast_prognose_morgen', 'detailedForecast') or []) %}
+            {% set pts = state_attr('sensor.e3dc_maestro_forecast_soc_trajektorie_24h', 'trajectory_points') or [] %}
+            {% set ns = namespace(
+              t1=states('sensor.pufferflex_eingange_fuhler_1_oben') | float(0),
+              t2=states('sensor.pufferflex_eingange_fuhler_2') | float(0),
+              t3=states('sensor.pufferflex_eingange_fuhler_3') | float(0),
+              e1=states('sensor.pufferflex_eingange_fuhler_1_oben') | float(0),
+              e2=states('sensor.pufferflex_eingange_fuhler_2') | float(0),
+              e3=states('sensor.pufferflex_eingange_fuhler_3') | float(0),
+              soc=states('sensor.e3dc_battery_state_of_charge') | float(0),
+              pv=0.0, socn=0.0, ts=[], top_ohne=[], top_mit=[], pvs=[], sur=[], socs=[]) %}
+            {% for i in range(48) %}
+              {% set ts = now() + timedelta(minutes=i * 30) %}
+              {% set n = ts.strftime('%H:%M:%S') %}
+              {% set we = ts.isoweekday() >= 6 or is_state('input_boolean.heizung_feiertag', 'on') %}
+              {% set ww_kw = (ww_tag * 0.7) / 3.0 if n >= '06:00:00' and n < '09:00:00' else ((ww_tag * 0.3) / 3.0 if n >= '18:00:00' and n < '21:00:00' else 0.0) %}
+              {% if we %}
+                {% set hyd = (n >= states('input_datetime.heizung_bad_we_start') and n < states('input_datetime.heizung_bad_we_ende'))
+                          or (n >= states('input_datetime.heizung_spiel_we_start') and n < states('input_datetime.heizung_spiel_we_ende')) %}
+              {% else %}
+                {% set hyd = (n >= states('input_datetime.heizung_bad_morgens_start') and n < states('input_datetime.heizung_bad_morgens_ende'))
+                          or (n >= states('input_datetime.heizung_bad_abends_start') and n < states('input_datetime.heizung_bad_abends_ende'))
+                          or (n >= states('input_datetime.heizung_spiel_wt_start') and n < states('input_datetime.heizung_spiel_wt_ende')) %}
+              {% endif %}
+              {% set hyd_kw = hk_kw if hyd and not ventile_zu and not heiz_aus and is_state('binary_sensor.heizung_hydraulisch_bedarf', 'on') else 0.0 %}
+              {% set ns.pv = 0.0 %}
+              {% for p in fc %}
+                {% set ps = as_datetime(p.period_start) %}
+                {% if ps is not none %}
+                  {% if ps.tzinfo is none %}{% set ps = ps.replace(tzinfo=now().tzinfo) %}{% endif %}
+                  {% if ts >= ps and ts < ps + timedelta(minutes=30) %}{% set ns.pv = p.pv_estimate | float(0) %}{% endif %}
+                {% endif %}
+              {% endfor %}
+              {% set ms = ts.timestamp() * 1000 %}
+              {% set ns.socn = ns.soc %}
+              {% for p in pts %}
+                {% if p[0] <= ms %}{% set ns.socn = p[1] | float(0) %}{% endif %}
+              {% endfor %}
+              {% set bat_kw = (ns.socn - ns.soc) / 100.0 * 15.0 / dt_h %}
+              {% set surplus = [ns.pv - haus_kw - ([bat_kw, 0] | max), 0] | max %}
+              {% set cap = m * cp %}
+              {% set q = (ww_kw + hyd_kw + 0.08) * dt_h * 1000.0 %}
+              {% set d1 = [q / cap, ns.t1 - 20] | min %}{% set ns.t1 = ns.t1 - d1 %}{% set q = q - d1 * cap %}
+              {% set d2 = [q / cap, ns.t2 - 20] | min %}{% set ns.t2 = ns.t2 - d2 %}{% set q = q - d2 * cap %}
+              {% set d3 = [q / cap, ns.t3 - 20] | min %}{% set ns.t3 = ns.t3 - d3 %}
+              {% set qe = (ww_kw + hyd_kw + 0.08) * dt_h * 1000.0 %}
+              {% set de1 = [qe / cap, ns.e1 - 20] | min %}{% set ns.e1 = ns.e1 - de1 %}{% set qe = qe - de1 * cap %}
+              {% set de2 = [qe / cap, ns.e2 - 20] | min %}{% set ns.e2 = ns.e2 - de2 %}{% set qe = qe - de2 * cap %}
+              {% set de3 = [qe / cap, ns.e3 - 20] | min %}{% set ns.e3 = ns.e3 - de3 %}
+              {% set elwa_ziel = states('input_number.heizung_elwa_ziel_c') | float(80) %}
+              {% set elwa = [surplus, 3.5] | min if ns.e2 < elwa_ziel else 0.0 %}
+              {% set dT = elwa * dt_h * 1000.0 / cap %}
+              {% set ns.e2 = [ns.e2 + dT * 0.70, elwa_ziel] | min %}
+              {% set ns.e1 = [ns.e1 + dT * 0.20, elwa_ziel] | min %}
+              {% set ns.e3 = ns.e3 + dT * 0.10 %}
+              {% set ns.ts = ns.ts + [(ts.timestamp() * 1000) | int] %}
+              {% set ns.top_ohne = ns.top_ohne + [(ns.t1 * 10) | round(0) / 10] %}
+              {% set ns.top_mit = ns.top_mit + [(ns.e1 * 10) | round(0) / 10] %}
+              {% set ns.pvs = ns.pvs + [(ns.pv * 10) | round(0) / 10] %}
+              {% set ns.sur = ns.sur + [(surplus * 10) | round(0) / 10] %}
+              {% set ns.socs = ns.socs + [(ns.socn * 10) | round(0) / 10] %}
+              {% set ns.soc = ns.socn %}
+            {% endfor %}
+            {{ {'ts': ns.ts, 'top_ohne': ns.top_ohne, 'top_mit': ns.top_mit, 'pv_kw': ns.pvs, 'surplus_kw': ns.sur, 'soc': ns.socs} | tojson }}
