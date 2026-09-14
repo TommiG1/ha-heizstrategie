@@ -1,0 +1,11 @@
+_raw/
+_external_entities.txt
+COMMUNITY_POST.md
+.DS_Store
+*.bak
+.env
+secrets.yaml
+*.pem
+*.key
+.idea/
+.vscode/

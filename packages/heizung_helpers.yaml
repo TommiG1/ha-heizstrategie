@@ -1,0 +1,577 @@
+# Heating helpers (package)
+# From live HA config; remap hardware entities in templates/scripts. See ENTITY_MAP.md.
+
+input_boolean:
+  heizung_klima_auto:
+    name: Klima automatisch
+    icon: mdi:air-conditioner
+    initial: true
+  heizung_tado_auto:
+    name: tado automatisch
+    icon: mdi:radiator
+    initial: true
+  heizung_ventile_zu:
+    name: Alle Ventile zu
+    icon: mdi:valve-closed
+  heizung_eta_auto:
+    name: ETA automatisch
+    icon: mdi:fire
+    initial: true
+  heizung_feiertag:
+    name: Heute Feiertag (wie Wochenende)
+    icon: mdi:calendar-star
+    initial: false
+  heizung_aussen_kalt_ok:
+    name: Außen kalt bestätigt
+    icon: mdi:snowflake
+    initial: false
+  heizung_schlafraum_kalt_ok:
+    name: Schlafraum kalt bestätigt
+    icon: mdi:bed
+    initial: false
+  heizung_fenster_wohnen_ok:
+    name: Fenster Wohnen bestätigt (3 min)
+    icon: mdi:window-open
+    initial: false
+  heizung_fenster_buero_ok:
+    name: Fenster Büro bestätigt (3 min)
+    icon: mdi:window-open
+    initial: false
+  heizung_fenster_bad_ok:
+    name: Fenster Bad bestätigt (3 min)
+    icon: mdi:window-open
+    initial: false
+  heizung_fenster_spiel_ok:
+    name: Fenster Spielzimmer bestätigt (3 min)
+    icon: mdi:window-open
+    initial: false
+  heizung_fenster_schlafen_b_ok:
+    name: Fenster Schlafen B bestätigt (3 min)
+    icon: mdi:window-open
+    initial: false
+  heizung_fenster_schlafen_c_ok:
+    name: Fenster Schlafen C bestätigt (3 min)
+    icon: mdi:window-open
+    initial: false
+
+
+input_number:
+  heizung_wohnen_boost_c:
+    name: Wohnen Boost °C
+    min: 16
+    max: 24
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:thermometer-high
+    initial: 22
+  heizung_wohnen_tag_c:
+    name: Wohnen Tag °C
+    min: 16
+    max: 24
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:thermometer
+    initial: 21
+  heizung_wohnen_nacht_c:
+    name: Wohnen kalte Nacht °C
+    min: 16
+    max: 24
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:weather-night
+    initial: 21
+  heizung_buero_c:
+    name: Büro °C
+    min: 16
+    max: 24
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:desk
+    initial: 21
+  heizung_schlafen_a_c:
+    name: Schlafen A °C
+    min: 16
+    max: 24
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:bed
+    initial: 20
+  heizung_schlafen_b_c:
+    name: Schlafen B °C
+    min: 16
+    max: 24
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:bed
+    initial: 20
+  heizung_schlafen_c_c:
+    name: Schlafen C °C
+    min: 16
+    max: 24
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:bed
+    initial: 20
+  heizung_bad_c:
+    name: Bad Werktag °C
+    min: 16
+    max: 24
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:shower
+    initial: 22
+  heizung_bad_we_c:
+    name: Bad Wochenende °C
+    min: 16
+    max: 24
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:shower
+    initial: 21
+  heizung_spiel_c:
+    name: Spielzimmer °C
+    min: 16
+    max: 24
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:teddy-bear
+    initial: 21
+  heizung_tado_halten_c:
+    name: tado kalte Nacht halten °C
+    min: 14
+    max: 20
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:radiator
+    initial: 17
+  heizung_tado_aus_c:
+    name: tado Ventil zu °C
+    min: 5
+    max: 16
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: box
+    icon: mdi:radiator-off
+    initial: 5
+  heizung_nacht_raum_c:
+    name: Nacht Schlafraum unter °C
+    min: 12
+    max: 20
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:thermometer-minus
+    initial: 16
+  heizung_nacht_raum_aus_c:
+    name: Nacht Schlafraum aus °C
+    min: 14
+    max: 22
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:thermometer-plus
+    initial: 17
+  heizung_nacht_aussen_c:
+    name: Nacht Außen unter °C
+    min: -10
+    max: 10
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:snowflake
+    initial: 2
+  heizung_nacht_aussen_aus_c:
+    name: Nacht Außen aus °C
+    min: -5
+    max: 15
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:snowflake-off
+    initial: 4
+  heizung_fenster_auf_min:
+    name: Fenster auf bis Heizung aus (min)
+    min: 1
+    max: 15
+    step: 1
+    unit_of_measurement: min
+    mode: box
+    icon: mdi:window-open
+    initial: 3
+  heizung_fenster_zu_sperre_min:
+    name: Sperre nach Fenster zu (min)
+    min: 5
+    max: 60
+    step: 1
+    unit_of_measurement: min
+    mode: box
+    icon: mdi:timer-pause
+    initial: 15
+  heizung_debounce_raum_min:
+    name: Schlafraum kalt halten (min)
+    min: 5
+    max: 60
+    step: 1
+    unit_of_measurement: min
+    mode: box
+    icon: mdi:timer-sand
+    initial: 20
+  heizung_debounce_aussen_min:
+    name: Außen kalt halten (min)
+    min: 5
+    max: 90
+    step: 1
+    unit_of_measurement: min
+    mode: box
+    icon: mdi:timer-sand
+    initial: 30
+  heizung_klima_idle_w:
+    name: Klima aus unter W
+    min: 20
+    max: 150
+    step: 5
+    unit_of_measurement: "W"
+    mode: box
+    icon: mdi:flash
+    initial: 50
+  heizung_klima_idle_min:
+    name: Klima aus nach Idle (min)
+    min: 5
+    max: 60
+    step: 1
+    unit_of_measurement: min
+    mode: box
+    icon: mdi:timer-sand
+    initial: 20
+  heizung_eta_puffer_min_c:
+    name: ETA wenn Puffer oben unter °C
+    min: 30
+    max: 70
+    step: 1
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:water-thermometer
+    initial: 45
+  heizung_eta_mindestlauf_min:
+    name: ETA Mindestlauf (min)
+    min: 30
+    max: 240
+    step: 15
+    unit_of_measurement: min
+    mode: box
+    icon: mdi:timer
+    initial: 90
+  heizung_eta_pause_min:
+    name: ETA Pause nach Stopp (min)
+    min: 0
+    max: 720
+    step: 30
+    unit_of_measurement: min
+    mode: box
+    icon: mdi:timer-off
+    initial: 240
+
+  heizung_ww_liter_tag:
+    name: WW-Zapfung Liter/Tag (Prognose)
+    min: 20
+    max: 400
+    step: 10
+    unit_of_measurement: L
+    mode: box
+    icon: mdi:water
+    initial: 80
+  heizung_heizkreis_kw:
+    name: Heizkreis-Leistung Prognose
+    min: 0
+    max: 8
+    step: 0.5
+    unit_of_measurement: kW
+    mode: box
+    icon: mdi:radiator
+    initial: 2
+
+  heizung_elwa_ziel_c:
+    name: ELWA Zieltemperatur (Prognose)
+    min: 50
+    max: 85
+    step: 1
+    unit_of_measurement: "°C"
+    mode: box
+    icon: mdi:thermometer-high
+    initial: 80
+
+  heizung_klima_manual_h:
+    name: Klima Manual Override Dauer
+    min: 1
+    max: 12
+    step: 1
+    unit_of_measurement: h
+    mode: box
+    icon: mdi:timer-cog
+    initial: 4
+
+  heizung_away_c:
+    name: Away Absenkung °C
+    min: 14
+    max: 20
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:thermometer-chevron-down
+    initial: 18
+
+input_select:
+  heizung_modus:
+    name: Heizstrategie Modus
+    icon: mdi:home-thermometer
+    options:
+      - Aus
+      - Übergang
+      - Winter
+      - Manuell
+    initial: Übergang
+  heizung_away:
+    name: Away Haus
+    icon: mdi:home-export-outline
+    options:
+      - Auto
+      - Away
+      - Home
+    initial: Auto
+  heizung_away_buero:
+    name: Away Büro
+    icon: mdi:desk
+    options:
+      - Auto
+      - Away
+      - Home
+    initial: Auto
+
+input_datetime:
+  heizung_wohnen_wt_boost_start:
+    name: Wohnen Werktag Boost Start
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+    initial: 05:30:00
+  heizung_wohnen_wt_boost_ende:
+    name: Wohnen Werktag Boost Ende
+    has_date: false
+    has_time: true
+    icon: mdi:clock-end
+    initial: 07:00:00
+  heizung_wohnen_wt_aus:
+    name: Wohnen Werktag aus
+    has_date: false
+    has_time: true
+    icon: mdi:clock-off
+    initial: '22:00:00'
+  heizung_wohnen_we_start:
+    name: Wohnen Wochenende Start
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+    initial: 08:00:00
+  heizung_wohnen_we_ende:
+    name: Wohnen Wochenende Ende
+    has_date: false
+    has_time: true
+    icon: mdi:clock-end
+    initial: '22:30:00'
+  heizung_buero_mo_frueh_start:
+    name: Büro Montag früh Start
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+    initial: 07:00:00
+  heizung_buero_mo_frueh_ende:
+    name: Büro Montag früh Ende
+    has_date: false
+    has_time: true
+    icon: mdi:clock-end
+    initial: 08:00:00
+  heizung_buero_mo_abend_start:
+    name: Büro Montag abend Start
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+    initial: '17:30:00'
+  heizung_buero_mo_abend_ende:
+    name: Büro Montag abend Ende
+    has_date: false
+    has_time: true
+    icon: mdi:clock-end
+    initial: '23:00:00'
+  heizung_buero_rest_start:
+    name: Büro Di–So Start
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+    initial: 08:00:00
+  heizung_buero_rest_ende:
+    name: Büro Di–So Ende
+    has_date: false
+    has_time: true
+    icon: mdi:clock-end
+    initial: '23:00:00'
+  heizung_schlafen_a_start:
+    name: Schlafen A Start
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+    initial: '10:00:00'
+  heizung_schlafen_a_ende:
+    name: Schlafen A Ende
+    has_date: false
+    has_time: true
+    icon: mdi:clock-end
+    initial: '21:00:00'
+  heizung_schlafen_b_start:
+    name: Schlafen B Start
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+    initial: '10:00:00'
+  heizung_schlafen_b_ende:
+    name: Schlafen B Ende
+    has_date: false
+    has_time: true
+    icon: mdi:clock-end
+    initial: '21:00:00'
+  heizung_schlafen_c_start:
+    name: Schlafen C Start
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+    initial: '10:00:00'
+  heizung_schlafen_c_ende:
+    name: Schlafen C Ende
+    has_date: false
+    has_time: true
+    icon: mdi:clock-end
+    initial: '21:00:00'
+  heizung_bad_morgens_start:
+    name: Bad Werktag morgens Start
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+    initial: 05:30:00
+  heizung_bad_morgens_ende:
+    name: Bad Werktag morgens Ende
+    has_date: false
+    has_time: true
+    icon: mdi:clock-end
+    initial: 07:00:00
+  heizung_bad_abends_start:
+    name: Bad Werktag abends Start
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+    initial: '19:00:00'
+  heizung_bad_abends_ende:
+    name: Bad Werktag abends Ende
+    has_date: false
+    has_time: true
+    icon: mdi:clock-end
+    initial: '21:00:00'
+  heizung_bad_we_start:
+    name: Bad Wochenende Start
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+    initial: 09:00:00
+  heizung_bad_we_ende:
+    name: Bad Wochenende Ende
+    has_date: false
+    has_time: true
+    icon: mdi:clock-end
+    initial: '19:00:00'
+  heizung_spiel_wt_start:
+    name: Spielzimmer Werktag Start
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+    initial: '14:00:00'
+  heizung_spiel_wt_ende:
+    name: Spielzimmer Werktag Ende
+    has_date: false
+    has_time: true
+    icon: mdi:clock-end
+    initial: '21:00:00'
+  heizung_spiel_we_start:
+    name: Spielzimmer Wochenende Start
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+    initial: '10:00:00'
+  heizung_spiel_we_ende:
+    name: Spielzimmer Wochenende Ende
+    has_date: false
+    has_time: true
+    icon: mdi:clock-end
+    initial: '23:00:00'
+
+timer:
+  heizung_sperre_wohnen:
+    name: Sperre Wohnen nach Lüften
+    duration: "00:15:00"
+    restore: true
+  heizung_sperre_buero:
+    name: Sperre Büro nach Lüften
+    duration: "00:15:00"
+    restore: true
+  heizung_sperre_bad:
+    name: Sperre Bad nach Lüften
+    duration: "00:15:00"
+    restore: true
+  heizung_sperre_spielzimmer:
+    name: Sperre Spielzimmer nach Lüften
+    duration: "00:15:00"
+    restore: true
+  heizung_sperre_schlafen_b:
+    name: Sperre Schlafen B nach Lüften
+    duration: "00:15:00"
+    restore: true
+  heizung_sperre_schlafen_c:
+    name: Sperre Schlafen C nach Lüften
+    duration: "00:15:00"
+    restore: true
+  heizung_eta_mindestlauf:
+    name: ETA Mindestlauf
+    duration: "01:30:00"
+    restore: true
+  heizung_eta_pause:
+    name: ETA Pause
+    duration: "04:00:00"
+    restore: true
+  heizung_klima_manual_wohnen:
+    name: Klima Manual Override Wohnen
+    duration: "04:00:00"
+    restore: true
+  heizung_klima_manual_buero:
+    name: Klima Manual Override Büro
+    duration: "04:00:00"
+    restore: true
+  heizung_klima_manual_schlafen_a:
+    name: Klima Manual Override Schlafen A
+    duration: "04:00:00"
+    restore: true
+  heizung_klima_manual_schlafen_b:
+    name: Klima Manual Override Schlafen B
+    duration: "04:00:00"
+    restore: true
+  heizung_klima_manual_schlafen_c:
+    name: Klima Manual Override Schlafen C
+    duration: "04:00:00"
+    restore: true

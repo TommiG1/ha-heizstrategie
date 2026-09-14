@@ -1,0 +1,340 @@
+# Mold templates (package)
+# 1) Local risk sensors (temp/humidity → margin like tado)
+# 2) Mold-heat binary sensors (boost climate when outdoor air is not drier)
+# 3) Ventilation advice aggregating room risks vs outdoor dew point
+# See ENTITY_MAP.md for room climate/humidity and tado risk entities.
+
+template:
+  # Lokale Schimmelrisiko-Sensoren (schneller als tado Cloud).
+  # Klassifikation wie tado_ce: Margin = Raumtemp − Taupunkt
+  # Critical <3, High <5, Medium <7, sonst Low.
+  - sensor:
+      - name: Schimmelpilzrisiko Wohnzimmer
+        unique_id: schimmel_risiko_wohnen_netatmo
+        default_entity_id: sensor.schimmel_risiko_wohnen
+        icon: mdi:mushroom
+        availability: >-
+          {{ states('sensor.wohnzimmer_temperatur_2') not in ['unknown', 'unavailable', '']
+             and states('sensor.wohnzimmer_luftfeuchtigkeit_2') not in ['unknown', 'unavailable', ''] }}
+        state: >-
+          {% set t = states('sensor.wohnzimmer_temperatur_2') | float(none) %}
+          {% set rh = states('sensor.wohnzimmer_luftfeuchtigkeit_2') | float(none) %}
+          {% if t is none or rh is none or rh <= 0 %}
+            unavailable
+          {% else %}
+            {% set gamma = (rh / 100) | log + (17.62 * t) / (243.12 + t) %}
+            {% set dp = (243.12 * gamma) / (17.62 - gamma) %}
+            {% set margin = t - dp %}
+            {% if margin < 3 %}Critical{% elif margin < 5 %}High{% elif margin < 7 %}Medium{% else %}Low{% endif %}
+          {% endif %}
+        attributes:
+          source: netatmo
+          room_temperature: "{{ states('sensor.wohnzimmer_temperatur_2') | float(none) }}"
+          humidity: "{{ states('sensor.wohnzimmer_luftfeuchtigkeit_2') | float(none) }}"
+          dew_point: >-
+            {% set t = states('sensor.wohnzimmer_temperatur_2') | float(none) %}
+            {% set rh = states('sensor.wohnzimmer_luftfeuchtigkeit_2') | float(none) %}
+            {% if t is none or rh is none or rh <= 0 %}
+              None
+            {% else %}
+              {% set gamma = (rh / 100) | log + (17.62 * t) / (243.12 + t) %}
+              {{ ((243.12 * gamma) / (17.62 - gamma)) | round(1) }}
+            {% endif %}
+          margin: >-
+            {% set t = states('sensor.wohnzimmer_temperatur_2') | float(none) %}
+            {% set rh = states('sensor.wohnzimmer_luftfeuchtigkeit_2') | float(none) %}
+            {% if t is none or rh is none or rh <= 0 %}
+              None
+            {% else %}
+              {% set gamma = (rh / 100) | log + (17.62 * t) / (243.12 + t) %}
+              {% set dp = (243.12 * gamma) / (17.62 - gamma) %}
+              {{ (t - dp) | round(1) }}
+            {% endif %}
+
+      - name: Schimmelpilzrisiko Schlafen C
+        unique_id: schimmel_risiko_schlafen_c_local
+        default_entity_id: sensor.schimmel_risiko_schlafen_c
+        icon: mdi:mushroom
+        availability: >-
+          {{ states('sensor.temp_schlafen_c_temperature') not in ['unknown', 'unavailable', '']
+             and states('sensor.temp_schlafen_c_humidity') not in ['unknown', 'unavailable', ''] }}
+        state: >-
+          {% set t = states('sensor.temp_schlafen_c_temperature') | float(none) %}
+          {% set rh = states('sensor.temp_schlafen_c_humidity') | float(none) %}
+          {% if t is none or rh is none or rh <= 0 %}
+            unavailable
+          {% else %}
+            {% set gamma = (rh / 100) | log + (17.62 * t) / (243.12 + t) %}
+            {% set dp = (243.12 * gamma) / (17.62 - gamma) %}
+            {% set margin = t - dp %}
+            {% if margin < 3 %}Critical{% elif margin < 5 %}High{% elif margin < 7 %}Medium{% else %}Low{% endif %}
+          {% endif %}
+        attributes:
+          source: aqara
+          room_temperature: "{{ states('sensor.temp_schlafen_c_temperature') | float(none) }}"
+          humidity: "{{ states('sensor.temp_schlafen_c_humidity') | float(none) }}"
+          dew_point: >-
+            {% set t = states('sensor.temp_schlafen_c_temperature') | float(none) %}
+            {% set rh = states('sensor.temp_schlafen_c_humidity') | float(none) %}
+            {% if t is none or rh is none or rh <= 0 %}
+              None
+            {% else %}
+              {% set gamma = (rh / 100) | log + (17.62 * t) / (243.12 + t) %}
+              {{ ((243.12 * gamma) / (17.62 - gamma)) | round(1) }}
+            {% endif %}
+          margin: >-
+            {% set t = states('sensor.temp_schlafen_c_temperature') | float(none) %}
+            {% set rh = states('sensor.temp_schlafen_c_humidity') | float(none) %}
+            {% if t is none or rh is none or rh <= 0 %}
+              None
+            {% else %}
+              {% set gamma = (rh / 100) | log + (17.62 * t) / (243.12 + t) %}
+              {% set dp = (243.12 * gamma) / (17.62 - gamma) %}
+              {{ (t - dp) | round(1) }}
+            {% endif %}
+  - binary_sensor:
+      # Schimmel-Heizen: nur 11–18 Uhr, nur wenn Schalter an,
+      # Risiko Medium/High und Außenluft nicht trockener (→ Heizen statt Lüften).
+      - name: Schimmel Heizen Fenster
+        unique_id: schimmel_heizen_fenster
+        default_entity_id: binary_sensor.schimmel_heizen_fenster
+        icon: mdi:clock-outline
+        state: >-
+          {% set n = now().strftime('%H:%M:%S') %}
+          {% set a = states('input_datetime.schimmel_heizen_start') %}
+          {% set b = states('input_datetime.schimmel_heizen_ende') %}
+          {{ a not in ['unknown', 'unavailable', ''] and b not in ['unknown', 'unavailable', ''] and n >= a and n < b }}
+
+      - name: Schimmel Heizen aktiv Büro
+        unique_id: schimmel_heizen_aktiv_buero
+        default_entity_id: binary_sensor.schimmel_heizen_aktiv_buero
+        icon: mdi:radiator
+        state: >-
+          {% set eid = 'sensor.buro_buro_schimmelpilzrisiko' %}
+          {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+          {% set in_dp = state_attr(eid, 'dew_point') | float(none) %}
+          {{ is_state('input_boolean.schimmel_heizen_buero', 'on')
+             and is_state('binary_sensor.schimmel_heizen_fenster', 'on')
+             and states(eid) in ['Medium', 'High', 'Critical']
+             and out_dp is not none and in_dp is not none
+             and (in_dp - out_dp) < 0.3
+             and is_state('binary_sensor.heizung_fenster_buero_roh', 'off') }}
+
+      - name: Schimmel Heizen aktiv Wohnen
+        unique_id: schimmel_heizen_aktiv_wohnen
+        default_entity_id: binary_sensor.schimmel_heizen_aktiv_wohnen
+        icon: mdi:radiator
+        state: >-
+          {% set eid = 'sensor.schimmel_risiko_wohnen' %}
+          {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+          {% set in_dp = state_attr(eid, 'dew_point') | float(none) %}
+          {{ is_state('input_boolean.schimmel_heizen_wohnen', 'on')
+             and is_state('binary_sensor.schimmel_heizen_fenster', 'on')
+             and states(eid) in ['Medium', 'High', 'Critical']
+             and out_dp is not none and in_dp is not none
+             and (in_dp - out_dp) < 0.3
+             and is_state('binary_sensor.heizung_fenster_wohnen_roh', 'off') }}
+
+      - name: Schimmel Heizen aktiv Schlafzimmer
+        unique_id: schimmel_heizen_aktiv_schlafzimmer
+        default_entity_id: binary_sensor.schimmel_heizen_aktiv_schlafzimmer
+        icon: mdi:radiator
+        state: >-
+          {% set eid = 'sensor.schlafzimmer_schlafzimmer_schimmelpilzrisiko' %}
+          {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+          {% set in_dp = state_attr(eid, 'dew_point') | float(none) %}
+          {{ is_state('input_boolean.schimmel_heizen_schlafzimmer', 'on')
+             and is_state('binary_sensor.schimmel_heizen_fenster', 'on')
+             and states(eid) in ['Medium', 'High', 'Critical']
+             and out_dp is not none and in_dp is not none
+             and (in_dp - out_dp) < 0.3
+             and is_state('binary_sensor.heizung_fenster_schlafen_b_roh', 'off') }}
+
+      - name: Schimmel Heizen aktiv Schlafen C
+        unique_id: schimmel_heizen_aktiv_schlafen_c
+        default_entity_id: binary_sensor.schimmel_heizen_aktiv_schlafen_c
+        icon: mdi:radiator
+        state: >-
+          {% set eid = 'sensor.schimmel_risiko_schlafen_c' %}
+          {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+          {% set in_dp = state_attr(eid, 'dew_point') | float(none) %}
+          {{ is_state('input_boolean.schimmel_heizen_schlafen_c', 'on')
+             and is_state('binary_sensor.schimmel_heizen_fenster', 'on')
+             and states(eid) in ['Medium', 'High', 'Critical']
+             and out_dp is not none and in_dp is not none
+             and (in_dp - out_dp) < 0.3
+             and is_state('binary_sensor.heizung_fenster_schlafen_c_roh', 'off') }}
+  - sensor:
+      - name: "Schimmel Lüftungsempfehlung"
+        unique_id: schimmel_lueftungsempfehlung
+        icon: mdi:weather-windy
+        state: >
+          {% set rooms = [
+            ('Büro', 'sensor.buro_buro_schimmelpilzrisiko'),
+            ('Wohnzimmer', 'sensor.schimmel_risiko_wohnen'),
+            ('Schlafen C', 'sensor.schimmel_risiko_schlafen_c'),
+            ('Schlafzimmer', 'sensor.schlafzimmer_schlafzimmer_schimmelpilzrisiko'),
+            ('Bad', 'sensor.bad_bad_schimmelpilzrisiko'),
+            ('Spielzimmer', 'sensor.spielzimmer_spielzimmer_schimmelpilzrisiko'),
+          ] %}
+          {% set out_t = state_attr('weather.home', 'temperature') | float(none) %}
+          {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+          {% set ns = namespace(risk=0, lueften=0, heizen=0, stoss=0) %}
+          {% if out_dp is not none and out_t is not none %}
+            {% for name, eid in rooms %}
+              {% if states(eid) in ['Medium', 'High', 'Critical'] %}
+                {% set ns.risk = ns.risk + 1 %}
+                {% set in_dp = state_attr(eid, 'dew_point') | float(none) %}
+                {% if in_dp is none %}
+                  {% set ns.heizen = ns.heizen + 1 %}
+                {% else %}
+                  {% set delta = in_dp - out_dp %}
+                  {% if delta >= 1.0 %}
+                    {% if out_t < 5 %}
+                      {% set ns.stoss = ns.stoss + 1 %}
+                    {% else %}
+                      {% set ns.lueften = ns.lueften + 1 %}
+                    {% endif %}
+                  {% elif delta >= 0.3 %}
+                    {% if out_t < 12 %}
+                      {% set ns.stoss = ns.stoss + 1 %}
+                    {% else %}
+                      {% set ns.lueften = ns.lueften + 1 %}
+                    {% endif %}
+                  {% else %}
+                    {% set ns.heizen = ns.heizen + 1 %}
+                  {% endif %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+          {% if ns.risk == 0 %}
+            Kein Risiko
+          {% elif out_dp is none %}
+            Unbekannt
+          {% elif ns.lueften > 0 and ns.heizen == 0 and ns.stoss == 0 %}
+            Lüften
+          {% elif ns.stoss > 0 and ns.heizen == 0 and ns.lueften == 0 %}
+            Stoßlüften + heizen
+          {% elif ns.heizen > 0 and ns.lueften == 0 and ns.stoss == 0 %}
+            Heizen
+          {% elif (ns.lueften > 0 or ns.stoss > 0) and ns.heizen > 0 %}
+            Gemischt
+          {% elif ns.lueften > 0 and ns.stoss > 0 %}
+            Stoßlüften
+          {% else %}
+            Heizen
+          {% endif %}
+        attributes:
+          outdoor_temperature: "{{ state_attr('weather.home', 'temperature') }}"
+          outdoor_humidity: "{{ state_attr('weather.home', 'humidity') }}"
+          outdoor_dew_point: "{{ state_attr('weather.home', 'dew_point') }}"
+          summary: >
+            {% set out_t = state_attr('weather.home', 'temperature') | float(none) %}
+            {% set out_rh = state_attr('weather.home', 'humidity') | float(none) %}
+            {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+            {% if out_t is not none and out_rh is not none and out_dp is not none %}
+              Außen {{ out_t | round(1) }} °C · {{ out_rh | round(0) }} % · Taupunkt {{ out_dp | round(1) }} °C
+            {% else %}
+              Außendaten nicht verfügbar
+            {% endif %}
+          detail: >
+            {% set rooms = [
+              ('Büro', 'sensor.buro_buro_schimmelpilzrisiko'),
+              ('Wohnzimmer', 'sensor.schimmel_risiko_wohnen'),
+              ('Schlafen C', 'sensor.schimmel_risiko_schlafen_c'),
+              ('Schlafzimmer', 'sensor.schlafzimmer_schlafzimmer_schimmelpilzrisiko'),
+              ('Bad', 'sensor.bad_bad_schimmelpilzrisiko'),
+              ('Spielzimmer', 'sensor.spielzimmer_spielzimmer_schimmelpilzrisiko'),
+            ] %}
+            {% set out_t = state_attr('weather.home', 'temperature') | float(none) %}
+            {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+            {% set ns = namespace(risk=0, lines=[]) %}
+            {% if out_dp is not none and out_t is not none %}
+              {% for name, eid in rooms %}
+                {% if states(eid) in ['Medium', 'High', 'Critical'] %}
+                  {% set ns.risk = ns.risk + 1 %}
+                  {% set in_dp = state_attr(eid, 'dew_point') | float(none) %}
+                  {% if in_dp is not none %}
+                    {% set delta = in_dp - out_dp %}
+                    {% if delta >= 1.0 %}
+                      {% if out_t < 5 %}
+                        {% set ns.lines = ns.lines + [name ~ ': kurz stoßlüften, danach heizen'] %}
+                      {% else %}
+                        {% set ns.lines = ns.lines + [name ~ ': lüften (außen ' ~ (delta | round(1)) ~ ' °C trockener)'] %}
+                      {% endif %}
+                    {% elif delta >= 0.3 %}
+                      {% if out_t < 12 %}
+                        {% set ns.lines = ns.lines + [name ~ ': kurz stoßlüften, danach heizen'] %}
+                      {% else %}
+                        {% set ns.lines = ns.lines + [name ~ ': lüften (außen etwas trockener)'] %}
+                      {% endif %}
+                    {% else %}
+                      {% set ns.lines = ns.lines + [name ~ ': nicht lüften — heizen'] %}
+                    {% endif %}
+                  {% else %}
+                    {% set ns.lines = ns.lines + [name ~ ': Daten unvollständig — heizen'] %}
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+            {% if ns.risk == 0 %}
+              Kein erhöhtes Schimmelrisiko — kein Handeln nötig.
+            {% elif out_dp is none %}
+              Außendaten fehlen — Empfehlung nicht möglich.
+            {% else %}
+              {{ ns.lines | join(' · ') }}
+            {% endif %}
+          rooms_ventilate: >
+            {% set rooms = [
+              ('Büro', 'sensor.buro_buro_schimmelpilzrisiko'),
+              ('Wohnzimmer', 'sensor.schimmel_risiko_wohnen'),
+              ('Schlafen C', 'sensor.schimmel_risiko_schlafen_c'),
+              ('Schlafzimmer', 'sensor.schlafzimmer_schlafzimmer_schimmelpilzrisiko'),
+              ('Bad', 'sensor.bad_bad_schimmelpilzrisiko'),
+              ('Spielzimmer', 'sensor.spielzimmer_spielzimmer_schimmelpilzrisiko'),
+            ] %}
+            {% set out_t = state_attr('weather.home', 'temperature') | float(none) %}
+            {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+            {% set ns = namespace(names=[]) %}
+            {% if out_dp is not none and out_t is not none %}
+              {% for name, eid in rooms %}
+                {% if states(eid) in ['Medium', 'High', 'Critical'] %}
+                  {% set in_dp = state_attr(eid, 'dew_point') | float(none) %}
+                  {% if in_dp is not none %}
+                    {% set delta = in_dp - out_dp %}
+                    {% if delta >= 1.0 and out_t >= 5 %}
+                      {% set ns.names = ns.names + [name] %}
+                    {% elif delta >= 0.3 and out_t >= 12 %}
+                      {% set ns.names = ns.names + [name] %}
+                    {% endif %}
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+            {{ ns.names | join(', ') }}
+          rooms_heat: >
+            {% set rooms = [
+              ('Büro', 'sensor.buro_buro_schimmelpilzrisiko'),
+              ('Wohnzimmer', 'sensor.schimmel_risiko_wohnen'),
+              ('Schlafen C', 'sensor.schimmel_risiko_schlafen_c'),
+              ('Schlafzimmer', 'sensor.schlafzimmer_schlafzimmer_schimmelpilzrisiko'),
+              ('Bad', 'sensor.bad_bad_schimmelpilzrisiko'),
+              ('Spielzimmer', 'sensor.spielzimmer_spielzimmer_schimmelpilzrisiko'),
+            ] %}
+            {% set out_t = state_attr('weather.home', 'temperature') | float(none) %}
+            {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+            {% set ns = namespace(names=[]) %}
+            {% if out_dp is not none and out_t is not none %}
+              {% for name, eid in rooms %}
+                {% if states(eid) in ['Medium', 'High', 'Critical'] %}
+                  {% set in_dp = state_attr(eid, 'dew_point') | float(none) %}
+                  {% if in_dp is none or (in_dp - out_dp) < 0.3 %}
+                    {% set ns.names = ns.names + [name] %}
+                  {% elif (in_dp - out_dp) >= 0.3 and out_t < 12 %}
+                    {% set ns.names = ns.names + [name] %}
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+            {{ ns.names | join(', ') }}

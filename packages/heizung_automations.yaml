@@ -1,0 +1,350 @@
+# Heating automations (package)
+
+automation:
+  - id: heizung_ventile_zu
+    alias: Heizung Ventile zu
+    description: Schließt alle Heizkörperventile sofort, unabhängig vom Modus.
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: input_boolean.heizung_ventile_zu
+        to: "on"
+    action:
+      - action: script.heizung_ventile_schliessen
+
+  - id: heizung_takt
+    alias: Heizung Takt
+    description: Wendet Sollwerte aus Helpern auf Klima, tado und ETA an. Bei Modus Aus Failsafe.
+    mode: queued
+    max: 2
+    trigger:
+      - platform: time_pattern
+        minutes: "/1"
+      - platform: state
+        entity_id:
+          - input_select.heizung_modus
+          - input_boolean.heizung_klima_auto
+          - input_boolean.heizung_tado_auto
+          - input_boolean.heizung_eta_auto
+          - input_boolean.heizung_ventile_zu
+          - sensor.heizung_soll_wohnen
+          - sensor.heizung_soll_buero
+          - sensor.heizung_soll_schlafen_a
+          - sensor.heizung_soll_schlafen_b
+          - sensor.heizung_soll_schlafen_c
+          - sensor.heizung_soll_bad
+          - sensor.heizung_soll_spielzimmer
+          - sensor.heizung_puffer_prognose
+          - binary_sensor.heizung_kalte_nacht_schlafen
+          - binary_sensor.heizung_dwd_puffer_vorbereitung
+          - binary_sensor.heizung_hydraulisch_bedarf
+          - binary_sensor.heizung_puffer_reicht
+          - binary_sensor.heizung_fenster_relevant_offen
+          - binary_sensor.heizung_sperre_wohnen
+          - binary_sensor.heizung_sperre_buero
+          - binary_sensor.heizung_sperre_bad
+          - binary_sensor.heizung_sperre_spielzimmer
+          - binary_sensor.heizung_sperre_schlafen_b
+          - binary_sensor.heizung_sperre_schlafen_c
+    action:
+      - action: script.heizung_tick
+
+  - id: heizung_klima_manual_override
+    alias: Heizung Klima Manual Override erkennen
+    description: >-
+      Startet Override-Timer bei manuellem Nicht-Heizen oder Heat-Soll ungleich Strategie-Soll;
+      cancelt bei Aus oder Heat mit Strategie-Soll.
+    mode: queued
+    max: 12
+    trigger:
+      - platform: state
+        entity_id:
+          - climate.wohnzimmer_2
+          - climate.esszimmer
+          - climate.faikin_mqtt_hvac
+          - climate.schlafen_a
+          - climate.schlafen_b
+          - climate.schlafen_c
+    variables:
+      timer_map:
+        climate.wohnzimmer_2: timer.heizung_klima_manual_wohnen
+        climate.esszimmer: timer.heizung_klima_manual_wohnen
+        climate.faikin_mqtt_hvac: timer.heizung_klima_manual_buero
+        climate.schlafen_a: timer.heizung_klima_manual_schlafen_a
+        climate.schlafen_b: timer.heizung_klima_manual_schlafen_b
+        climate.schlafen_c: timer.heizung_klima_manual_schlafen_c
+      soll_map:
+        climate.wohnzimmer_2: sensor.heizung_soll_wohnen
+        climate.esszimmer: sensor.heizung_soll_wohnen
+        climate.faikin_mqtt_hvac: sensor.heizung_soll_buero
+        climate.schlafen_a: sensor.heizung_soll_schlafen_a
+        climate.schlafen_b: sensor.heizung_soll_schlafen_b
+        climate.schlafen_c: sensor.heizung_soll_schlafen_c
+      manual_timer: "{{ timer_map[trigger.entity_id] }}"
+      soll_entity: "{{ soll_map[trigger.entity_id] }}"
+      new_state: "{{ trigger.to_state.state }}"
+      old_state: "{{ trigger.from_state.state if trigger.from_state else 'unknown' }}"
+      new_temp: "{{ state_attr(trigger.entity_id, 'temperature') }}"
+      old_temp: "{{ trigger.from_state.attributes.get('temperature') if trigger.from_state else none }}"
+      soll: "{{ states(soll_entity) }}"
+      temp_matches_soll: >-
+        {% set t = new_temp | float(-999) %}
+        {{ soll not in ['off', 'unknown', 'unavailable']
+           and t > -900
+           and ((t - (soll | float)) | abs) < 0.25 }}
+    condition:
+      - condition: template
+        value_template: >-
+          {{ trigger.to_state is not none
+             and new_state not in ['unavailable', 'unknown']
+             and (old_state != new_state or (new_temp | string) != (old_temp | string)) }}
+    action:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: >-
+                  {{ ((new_state in ['fan_only', 'cool', 'dry', 'heat_cool'])
+                      or (new_state == 'heat' and not (temp_matches_soll | bool)))
+                     and is_state('input_boolean.heizung_klima_auto', 'on')
+                     and not is_state('input_select.heizung_modus', 'Aus') }}
+            sequence:
+              - action: timer.start
+                target:
+                  entity_id: "{{ manual_timer }}"
+                data:
+                  duration: "{{ (states('input_number.heizung_klima_manual_h') | float(4) * 3600) | int }}"
+          - conditions:
+              - condition: template
+                value_template: >-
+                  {{ new_state == 'off'
+                     or (new_state == 'heat' and (temp_matches_soll | bool)) }}
+            sequence:
+              - action: timer.cancel
+                target:
+                  entity_id: "{{ manual_timer }}"
+
+  - id: heizung_fenster
+    alias: Heizung Fenster Debounce
+    description: 3 min auf bis bestätigt, beim Schließen 15 min Sperre.
+    mode: parallel
+    max: 12
+    trigger:
+      - id: wohnen_auf
+        platform: state
+        entity_id: binary_sensor.heizung_fenster_wohnen_roh
+        to: "on"
+        for:
+          minutes: "{{ states('input_number.heizung_fenster_auf_min') | int(3) }}"
+      - id: wohnen_zu
+        platform: state
+        entity_id: binary_sensor.heizung_fenster_wohnen_roh
+        to: "off"
+      - id: buero_auf
+        platform: state
+        entity_id: binary_sensor.heizung_fenster_buero_roh
+        to: "on"
+        for:
+          minutes: "{{ states('input_number.heizung_fenster_auf_min') | int(3) }}"
+      - id: buero_zu
+        platform: state
+        entity_id: binary_sensor.heizung_fenster_buero_roh
+        to: "off"
+      - id: bad_auf
+        platform: state
+        entity_id: binary_sensor.heizung_fenster_bad_roh
+        to: "on"
+        for:
+          minutes: "{{ states('input_number.heizung_fenster_auf_min') | int(3) }}"
+      - id: bad_zu
+        platform: state
+        entity_id: binary_sensor.heizung_fenster_bad_roh
+        to: "off"
+      - id: spiel_auf
+        platform: state
+        entity_id: binary_sensor.heizung_fenster_spiel_roh
+        to: "on"
+        for:
+          minutes: "{{ states('input_number.heizung_fenster_auf_min') | int(3) }}"
+      - id: spiel_zu
+        platform: state
+        entity_id: binary_sensor.heizung_fenster_spiel_roh
+        to: "off"
+      - id: schlafen_b_auf
+        platform: state
+        entity_id: binary_sensor.heizung_fenster_schlafen_b_roh
+        to: "on"
+        for:
+          minutes: "{{ states('input_number.heizung_fenster_auf_min') | int(3) }}"
+      - id: schlafen_b_zu
+        platform: state
+        entity_id: binary_sensor.heizung_fenster_schlafen_b_roh
+        to: "off"
+      - id: schlafen_c_auf
+        platform: state
+        entity_id: binary_sensor.heizung_fenster_schlafen_c_roh
+        to: "on"
+        for:
+          minutes: "{{ states('input_number.heizung_fenster_auf_min') | int(3) }}"
+      - id: schlafen_c_zu
+        platform: state
+        entity_id: binary_sensor.heizung_fenster_schlafen_c_roh
+        to: "off"
+    action:
+      - choose:
+          - conditions: "{{ trigger.id == 'wohnen_auf' }}"
+            sequence:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.heizung_fenster_wohnen_ok
+          - conditions: "{{ trigger.id == 'wohnen_zu' }}"
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.heizung_fenster_wohnen_ok
+              - action: timer.start
+                target:
+                  entity_id: timer.heizung_sperre_wohnen
+                data:
+                  duration: "{{ states('input_number.heizung_fenster_zu_sperre_min') | int(15) * 60 }}"
+          - conditions: "{{ trigger.id == 'buero_auf' }}"
+            sequence:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.heizung_fenster_buero_ok
+          - conditions: "{{ trigger.id == 'buero_zu' }}"
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.heizung_fenster_buero_ok
+              - action: timer.start
+                target:
+                  entity_id: timer.heizung_sperre_buero
+                data:
+                  duration: "{{ states('input_number.heizung_fenster_zu_sperre_min') | int(15) * 60 }}"
+          - conditions: "{{ trigger.id == 'bad_auf' }}"
+            sequence:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.heizung_fenster_bad_ok
+          - conditions: "{{ trigger.id == 'bad_zu' }}"
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.heizung_fenster_bad_ok
+              - action: timer.start
+                target:
+                  entity_id: timer.heizung_sperre_bad
+                data:
+                  duration: "{{ states('input_number.heizung_fenster_zu_sperre_min') | int(15) * 60 }}"
+          - conditions: "{{ trigger.id == 'spiel_auf' }}"
+            sequence:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.heizung_fenster_spiel_ok
+          - conditions: "{{ trigger.id == 'spiel_zu' }}"
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.heizung_fenster_spiel_ok
+              - action: timer.start
+                target:
+                  entity_id: timer.heizung_sperre_spielzimmer
+                data:
+                  duration: "{{ states('input_number.heizung_fenster_zu_sperre_min') | int(15) * 60 }}"
+          - conditions: "{{ trigger.id == 'schlafen_b_auf' }}"
+            sequence:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.heizung_fenster_schlafen_b_ok
+          - conditions: "{{ trigger.id == 'schlafen_b_zu' }}"
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.heizung_fenster_schlafen_b_ok
+              - action: timer.start
+                target:
+                  entity_id: timer.heizung_sperre_schlafen_b
+                data:
+                  duration: "{{ states('input_number.heizung_fenster_zu_sperre_min') | int(15) * 60 }}"
+          - conditions: "{{ trigger.id == 'schlafen_c_auf' }}"
+            sequence:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.heizung_fenster_schlafen_c_ok
+          - conditions: "{{ trigger.id == 'schlafen_c_zu' }}"
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.heizung_fenster_schlafen_c_ok
+              - action: timer.start
+                target:
+                  entity_id: timer.heizung_sperre_schlafen_c
+                data:
+                  duration: "{{ states('input_number.heizung_fenster_zu_sperre_min') | int(15) * 60 }}"
+
+  - id: heizung_aussen_kalt_ein
+    alias: Heizung Außen kalt bestätigen
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.heizung_aussen_kalt_roh
+        to: "on"
+        for:
+          minutes: "{{ states('input_number.heizung_debounce_aussen_min') | int(30) }}"
+      - platform: state
+        entity_id: binary_sensor.heizung_dwd_puffer_vorbereitung
+        to: "on"
+        for:
+          minutes: "{{ states('input_number.heizung_debounce_aussen_min') | int(30) }}"
+    action:
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.heizung_aussen_kalt_ok
+
+  - id: heizung_aussen_kalt_aus
+    alias: Heizung Außen kalt zurücksetzen
+    mode: restart
+    trigger:
+      - platform: template
+        value_template: >-
+          {{ states('sensor.heizkreis_eingange_aussentemperatur') | float(-99) >
+             states('input_number.heizung_nacht_aussen_aus_c') | float(4)
+             and not is_state('binary_sensor.heizung_dwd_kalte_nacht', 'on') }}
+    action:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.heizung_aussen_kalt_ok
+
+  - id: heizung_schlafraum_kalt_ein
+    alias: Heizung Schlafraum kalt bestätigen
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.heizung_schlafraum_kalt_roh
+        to: "on"
+        for:
+          minutes: "{{ states('input_number.heizung_debounce_raum_min') | int(20) }}"
+    condition:
+      - condition: state
+        entity_id: binary_sensor.heizung_fenster_relevant_offen
+        state: "off"
+    action:
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.heizung_schlafraum_kalt_ok
+
+  - id: heizung_schlafraum_kalt_aus
+    alias: Heizung Schlafraum kalt zurücksetzen
+    mode: restart
+    trigger:
+      - platform: template
+        value_template: >-
+          {% set lim = states('input_number.heizung_nacht_raum_aus_c') | float(17) %}
+          {% set t1 = state_attr('climate.schlafen_a', 'current_temperature') | float(0) %}
+          {% set t2 = state_attr('climate.schlafen_b', 'current_temperature') | float(0) %}
+          {% set t3 = state_attr('climate.schlafen_c', 'current_temperature') | float(0) %}
+          {{ t1 >= lim and t2 >= lim and t3 >= lim }}
+    action:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.heizung_schlafraum_kalt_ok

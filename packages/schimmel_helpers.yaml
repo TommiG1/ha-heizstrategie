@@ -1,0 +1,45 @@
+# Mold helpers (package)
+# Per-room mold-heat boost switches and daytime window for climate setpoint raise.
+
+input_boolean:
+  schimmel_heizen_buero:
+    name: Schimmel heizen Büro
+    icon: mdi:mushroom
+    initial: true
+  schimmel_heizen_wohnen:
+    name: Schimmel heizen Wohnen
+    icon: mdi:mushroom
+    initial: true
+  schimmel_heizen_schlafzimmer:
+    name: Schimmel heizen Schlafzimmer
+    icon: mdi:mushroom
+    initial: true
+  schimmel_heizen_schlafen_c:
+    name: Schimmel heizen Schlafen C
+    icon: mdi:mushroom
+    initial: true
+
+input_number:
+  schimmel_heizen_c:
+    name: Schimmel heizen Ziel °C
+    min: 18
+    max: 24
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: slider
+    icon: mdi:thermometer-plus
+    initial: 22
+
+input_datetime:
+  schimmel_heizen_start:
+    name: Schimmel heizen Start
+    has_date: false
+    has_time: true
+    icon: mdi:clock-start
+    initial: "11:00:00"
+  schimmel_heizen_ende:
+    name: Schimmel heizen Ende
+    has_date: false
+    has_time: true
+    icon: mdi:clock-end
+    initial: "18:00:00"

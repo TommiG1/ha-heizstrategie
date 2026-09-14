@@ -1,0 +1,330 @@
+# Heating scripts (package)
+
+script:
+  heizung_apply_klima:
+    alias: Heizung Klima setzen
+    mode: parallel
+    max: 12
+    sequence:
+    - variables:
+        manual_active: '{{ (manual_timer | default("")) not in ["", none] and is_state(manual_timer, ''active'') }}'
+        aus: '{{ sperre | bool or soll in [''off'', ''unknown'', ''unavailable''] }}'
+        braucht: '{{ (not (sperre | bool)) and soll not in [''off'', ''unknown'', ''unavailable''] and (state_attr(entity_id, ''current_temperature'') | float(99) < soll | float(20)) }}'
+        idle_ok: '{% if entity_id in [''climate.wohnzimmer_2'', ''climate.esszimmer''] %}{% set w = ''binary_sensor.heizung_klima_wenig_wohnen'' %}{% elif entity_id in [''climate.schlafen_a'', ''climate.schlafen_b'', ''climate.schlafen_c''] %}{% set w = ''binary_sensor.heizung_klima_wenig_schlafen'' %}{% else %}{% set w = ''binary_sensor.heizung_klima_wenig_buero'' %}{% endif %}{% set sec = states(''input_number.heizung_klima_idle_min'') | int(20) * 60 %}{{ is_state(w, ''on'') and states[w] is not none and (now() - states[w].last_changed).total_seconds() >= sec }}'
+    - choose:
+      - conditions: '{{ manual_active | bool }}'
+        sequence: []
+      - conditions: '{{ aus | bool }}'
+        sequence:
+        - action: climate.turn_off
+          target:
+            entity_id: '{{ entity_id }}'
+      - conditions: '{{ braucht | bool and not is_state(entity_id, ''heat'') }}'
+        sequence:
+        - action: climate.set_hvac_mode
+          target:
+            entity_id: '{{ entity_id }}'
+          data:
+            hvac_mode: heat
+        - action: climate.set_temperature
+          target:
+            entity_id: '{{ entity_id }}'
+          data:
+            temperature: '{{ soll | float(20) }}'
+      - conditions: '{{ is_state(entity_id, ''heat'') and (not (braucht | bool)) and (idle_ok | bool) }}'
+        sequence:
+        - action: climate.turn_off
+          target:
+            entity_id: '{{ entity_id }}'
+      - conditions: '{{ is_state(entity_id, ''heat'') }}'
+        sequence:
+        - action: climate.set_temperature
+          target:
+            entity_id: '{{ entity_id }}'
+          data:
+            temperature: '{{ soll | float(20) }}'
+  heizung_apply_tado:
+    alias: Heizung tado setzen
+    mode: parallel
+    max: 12
+    sequence:
+    - variables:
+        aus: '{{ sperre | bool or soll in [''off'', ''unknown'', ''unavailable''] }}'
+        braucht: '{{ (not (sperre | bool)) and soll not in [''off'', ''unknown'', ''unavailable''] and (state_attr(entity_id, ''current_temperature'') | float(99) < soll | float(20)) }}'
+    - choose:
+      - conditions: '{{ aus | bool or not (braucht | bool) }}'
+        sequence:
+        - action: climate.turn_off
+          target:
+            entity_id: '{{ entity_id }}'
+      - conditions: '{{ braucht | bool and not is_state(entity_id, ''heat'') }}'
+        sequence:
+        - action: climate.set_temperature
+          target:
+            entity_id: '{{ entity_id }}'
+          data:
+            hvac_mode: heat
+            temperature: '{{ soll | float(20) }}'
+      - conditions: '{{ is_state(entity_id, ''heat'') }}'
+        sequence:
+        - action: climate.set_temperature
+          target:
+            entity_id: '{{ entity_id }}'
+          data:
+            hvac_mode: heat
+            temperature: '{{ soll | float(20) }}'
+  heizung_failsafe_aus:
+    alias: Heizung Failsafe Aus
+    description: Schaltet Klima, Ventile, Heizkreis, Sofort laden und Kessel hart ab.
+    icon: mdi:power-off
+    mode: single
+    sequence:
+    - action: timer.cancel
+      target:
+        entity_id:
+        - timer.heizung_klima_manual_wohnen
+        - timer.heizung_klima_manual_buero
+        - timer.heizung_klima_manual_schlafen_a
+        - timer.heizung_klima_manual_schlafen_b
+        - timer.heizung_klima_manual_schlafen_c
+    - action: climate.turn_off
+      target:
+        entity_id:
+        - climate.wohnzimmer_2
+        - climate.esszimmer
+        - climate.faikin_mqtt_hvac
+        - climate.schlafen_a
+        - climate.schlafen_b
+        - climate.schlafen_c
+    - action: script.heizung_ventile_schliessen
+    - action: switch.turn_off
+      target:
+        entity_id:
+        - switch.heizkreis_sonstiges_ein_aus_taste
+        - switch.pufferflex_puffer_erzeuger_kessel_puffer_starten_nach_zusatzlichen_kriterien_extra_laden_sofort_laden
+        - switch.kessel_sonstiges_ein_aus_taste
+    - action: timer.cancel
+      target:
+        entity_id:
+        - timer.heizung_eta_mindestlauf
+        - timer.heizung_eta_pause
+  heizung_tick:
+    alias: Heizung Takt
+    mode: queued
+    max: 2
+    sequence:
+    - choose:
+      - conditions: "{{ is_state('input_select.heizung_modus', 'Aus') }}"
+        sequence:
+        - action: script.heizung_failsafe_aus
+        - stop: Modus Aus
+    - condition: state
+      entity_id: binary_sensor.heizung_aktiv
+      state: 'on'
+    - variables:
+        soll_wohnen: '{{ states(''sensor.heizung_soll_wohnen'') }}'
+        soll_buero: '{{ states(''sensor.heizung_soll_buero'') }}'
+        soll_schlafen_a: '{{ states(''sensor.heizung_soll_schlafen_a'') }}'
+        soll_schlafen_b: '{{ states(''sensor.heizung_soll_schlafen_b'') }}'
+        soll_schlafen_c: '{{ states(''sensor.heizung_soll_schlafen_c'') }}'
+        soll_bad: '{{ states(''sensor.heizung_soll_bad'') }}'
+        soll_spiel: '{{ states(''sensor.heizung_soll_spielzimmer'') }}'
+        nacht_schlafen: '{{ is_state(''binary_sensor.heizung_kalte_nacht_schlafen'',
+          ''on'') }}'
+        tado_schlafen_b_soll: '{% if states(''sensor.heizung_soll_schlafen_b'') != ''off'' %}off{% elif nacht_schlafen | bool %}{{ states(''input_number.heizung_tado_halten_c'') }}{% else %}off{% endif %}'
+        tado_schlafen_c_soll: '{% if states(''sensor.heizung_soll_schlafen_c'') != ''off'' %}off{% elif nacht_schlafen | bool %}{{ states(''input_number.heizung_tado_halten_c'') }}{% else %}off{% endif %}'
+        tado_bad_soll: '{% if states(''sensor.heizung_soll_bad'') != ''off'' %}{{ states(''sensor.heizung_soll_bad'') }}{% elif nacht_schlafen | bool %}{{ states(''input_number.heizung_tado_halten_c'') }}{% else %}off{% endif %}'
+        tado_spiel_soll: '{% if states(''sensor.heizung_soll_spielzimmer'') != ''off'' %}{{ states(''sensor.heizung_soll_spielzimmer'') }}{% elif nacht_schlafen | bool %}{{ states(''input_number.heizung_tado_halten_c'') }}{% else %}off{% endif %}'
+    - if:
+      - condition: state
+        entity_id: input_boolean.heizung_klima_auto
+        state: 'on'
+      then:
+      - action: script.heizung_apply_klima
+        data:
+          entity_id: climate.wohnzimmer_2
+          soll: '{{ soll_wohnen }}'
+          sperre: '{{ is_state(''binary_sensor.heizung_sperre_wohnen'', ''on'') }}'
+          manual_timer: timer.heizung_klima_manual_wohnen
+      - action: script.heizung_apply_klima
+        data:
+          entity_id: climate.esszimmer
+          soll: '{{ soll_wohnen }}'
+          sperre: '{{ is_state(''binary_sensor.heizung_sperre_wohnen'', ''on'') }}'
+          manual_timer: timer.heizung_klima_manual_wohnen
+      - action: script.heizung_apply_klima
+        data:
+          entity_id: climate.faikin_mqtt_hvac
+          soll: '{{ soll_buero }}'
+          sperre: '{{ is_state(''binary_sensor.heizung_sperre_buero'', ''on'') }}'
+          manual_timer: timer.heizung_klima_manual_buero
+      - action: script.heizung_apply_klima
+        data:
+          entity_id: climate.schlafen_a
+          soll: '{{ soll_schlafen_a }}'
+          sperre: false
+          manual_timer: timer.heizung_klima_manual_schlafen_a
+      - action: script.heizung_apply_klima
+        data:
+          entity_id: climate.schlafen_b
+          soll: '{{ soll_schlafen_b }}'
+          sperre: '{{ is_state(''binary_sensor.heizung_sperre_schlafen_b'', ''on'') }}'
+          manual_timer: timer.heizung_klima_manual_schlafen_b
+      - action: script.heizung_apply_klima
+        data:
+          entity_id: climate.schlafen_c
+          soll: '{{ soll_schlafen_c }}'
+          sperre: '{{ is_state(''binary_sensor.heizung_sperre_schlafen_c'', ''on'') }}'
+          manual_timer: timer.heizung_klima_manual_schlafen_c
+    - if:
+      - condition: state
+        entity_id: input_boolean.heizung_ventile_zu
+        state: 'on'
+      then:
+      - action: script.heizung_ventile_schliessen
+    - if:
+      - condition: state
+        entity_id: input_boolean.heizung_ventile_zu
+        state: 'off'
+      - condition: state
+        entity_id: input_boolean.heizung_tado_auto
+        state: 'on'
+      then:
+      - action: script.heizung_apply_tado
+        data:
+          entity_id: climate.wohnzimmer
+          soll: 'off'
+          sperre: true
+      - action: script.heizung_apply_tado
+        data:
+          entity_id: climate.buro
+          soll: 'off'
+          sperre: true
+      - action: script.heizung_apply_tado
+        data:
+          entity_id: climate.bad
+          soll: '{{ tado_bad_soll }}'
+          sperre: '{{ is_state(''binary_sensor.heizung_sperre_bad'', ''on'') }}'
+      - action: script.heizung_apply_tado
+        data:
+          entity_id: climate.spielzimmer
+          soll: '{{ tado_spiel_soll }}'
+          sperre: '{{ is_state(''binary_sensor.heizung_sperre_spielzimmer'', ''on'') }}'
+      - action: script.heizung_apply_tado
+        data:
+          entity_id: climate.schlafzimmer
+          soll: '{{ tado_schlafen_b_soll }}'
+          sperre: '{{ is_state(''binary_sensor.heizung_sperre_schlafen_b'', ''on'') }}'
+      - action: script.heizung_apply_tado
+        data:
+          entity_id: climate.schlafen_c_tado
+          soll: '{{ tado_schlafen_c_soll }}'
+          sperre: '{{ is_state(''binary_sensor.heizung_sperre_schlafen_c'', ''on'') }}'
+    - variables:
+        braucht_hk: '{{ is_state(''binary_sensor.heizung_hydraulisch_bedarf'', ''on'') }}'
+        prognose: '{{ states(''sensor.heizung_puffer_prognose'') }}'
+        puffer_ok: '{{ is_state(''binary_sensor.heizung_puffer_reicht'', ''on'') }}'
+        fenster_ok: '{{ is_state(''binary_sensor.heizung_fenster_relevant_offen'', ''off'') }}'
+        eta_auto: '{{ is_state(''input_boolean.heizung_eta_auto'', ''on'') }}'
+        eta_pause: '{{ not is_state(''timer.heizung_eta_pause'', ''idle'') }}'
+        eta_min: '{{ not is_state(''timer.heizung_eta_mindestlauf'', ''idle'') }}'
+        eta_notfall: '{{ is_state(''binary_sensor.heizung_kalte_nacht_schlafen'', ''on'') or is_state(''binary_sensor.heizung_dwd_puffer_vorbereitung'', ''on'') or prognose == ''fehlt'' }}'
+        braucht_sofort: >-
+          {{ (eta_auto | bool) and (fenster_ok | bool) and (
+               prognose == 'fehlt'
+               or ((not (puffer_ok | bool)) and is_state('binary_sensor.heizung_kalte_nacht_schlafen', 'on'))
+               or ((not (puffer_ok | bool)) and is_state('binary_sensor.heizung_dwd_puffer_vorbereitung', 'on'))
+               or (prognose in ['unknown', 'unavailable'] and not (puffer_ok | bool))
+             ) }}
+    - if:
+      - condition: state
+        entity_id: input_boolean.heizung_ventile_zu
+        state: 'off'
+      - condition: state
+        entity_id: input_boolean.heizung_tado_auto
+        state: 'on'
+      then:
+      - choose:
+        - conditions: '{{ braucht_hk | bool }}'
+          sequence:
+          - action: switch.turn_on
+            target:
+              entity_id: switch.heizkreis_sonstiges_ein_aus_taste
+        default:
+        - action: switch.turn_off
+          target:
+            entity_id: switch.heizkreis_sonstiges_ein_aus_taste
+    - if:
+      - condition: state
+        entity_id: input_boolean.heizung_eta_auto
+        state: 'on'
+      then:
+      - choose:
+        - conditions: '{{ (braucht_sofort | bool) and ((not (eta_pause | bool)) or (eta_notfall | bool)) }}'
+          sequence:
+          - action: switch.turn_on
+            target:
+              entity_id: switch.kessel_sonstiges_ein_aus_taste
+          - action: switch.turn_on
+            target:
+              entity_id: switch.pufferflex_puffer_erzeuger_kessel_puffer_starten_nach_zusatzlichen_kriterien_extra_laden_sofort_laden
+          - if:
+            - condition: state
+              entity_id: timer.heizung_eta_mindestlauf
+              state: idle
+            then:
+            - action: timer.start
+              target:
+                entity_id: timer.heizung_eta_mindestlauf
+              data:
+                duration: '{{ states(''input_number.heizung_eta_mindestlauf_min'') | int(90) * 60 }}'
+            - action: timer.cancel
+              target:
+                entity_id: timer.heizung_eta_pause
+        - conditions: '{{ (not (braucht_sofort | bool)) and (not (eta_min | bool)) }}'
+          sequence:
+          - action: switch.turn_off
+            target:
+              entity_id: switch.pufferflex_puffer_erzeuger_kessel_puffer_starten_nach_zusatzlichen_kriterien_extra_laden_sofort_laden
+          - if:
+            - condition: state
+              entity_id: switch.kessel_sonstiges_ein_aus_taste
+              state: 'on'
+            then:
+            - action: switch.turn_off
+              target:
+                entity_id: switch.kessel_sonstiges_ein_aus_taste
+            - action: timer.start
+              target:
+                entity_id: timer.heizung_eta_pause
+              data:
+                duration: '{{ states(''input_number.heizung_eta_pause_min'') | int(240) * 60 }}'
+      else:
+      - action: switch.turn_off
+        target:
+          entity_id: switch.pufferflex_puffer_erzeuger_kessel_puffer_starten_nach_zusatzlichen_kriterien_extra_laden_sofort_laden
+      - if:
+        - condition: template
+          value_template: '{{ not (eta_min | bool) }}'
+        then:
+        - action: switch.turn_off
+          target:
+            entity_id: switch.kessel_sonstiges_ein_aus_taste
+  heizung_ventile_schliessen:
+    alias: Heizung Ventile schließen
+    icon: mdi:valve-closed
+    mode: single
+    sequence:
+    - action: climate.turn_off
+      target:
+        entity_id:
+        - climate.wohnzimmer
+        - climate.buro
+        - climate.bad
+        - climate.spielzimmer
+        - climate.schlafzimmer
+        - climate.schlafen_c_tado
+        - climate.heizung_waschraum
+    - action: switch.turn_off
+      target:
+        entity_id: switch.heizkreis_sonstiges_ein_aus_taste
