@@ -407,6 +407,7 @@ views:
     cards:
       - type: entities
         title: Temperaturen
+        show_header_toggle: false
         entities:
           - input_number.heizung_wohnen_boost_c
           - input_number.heizung_wohnen_tag_c
@@ -422,6 +423,7 @@ views:
           - input_number.heizung_tado_aus_c
       - type: entities
         title: Wohnen Zeiten
+        show_header_toggle: false
         entities:
           - input_datetime.heizung_wohnen_wt_boost_start
           - input_datetime.heizung_wohnen_wt_boost_ende
@@ -430,6 +432,7 @@ views:
           - input_datetime.heizung_wohnen_we_ende
       - type: entities
         title: Büro Zeiten
+        show_header_toggle: false
         entities:
           - input_datetime.heizung_buero_mo_frueh_start
           - input_datetime.heizung_buero_mo_frueh_ende
@@ -439,6 +442,7 @@ views:
           - input_datetime.heizung_buero_rest_ende
       - type: entities
         title: Schlafen A / B / C
+        show_header_toggle: false
         entities:
           - input_datetime.heizung_schlafen_a_start
           - input_datetime.heizung_schlafen_a_ende
@@ -448,6 +452,7 @@ views:
           - input_datetime.heizung_schlafen_c_ende
       - type: entities
         title: Bad / Spielzimmer
+        show_header_toggle: false
         entities:
           - input_datetime.heizung_bad_morgens_start
           - input_datetime.heizung_bad_morgens_ende
@@ -461,6 +466,7 @@ views:
           - input_datetime.heizung_spiel_we_ende
       - type: entities
         title: Kalte Nacht / Lüften / ETA
+        show_header_toggle: false
         entities:
           - input_number.heizung_nacht_raum_c
           - input_number.heizung_nacht_raum_aus_c
@@ -479,3 +485,19 @@ views:
           - input_number.heizung_ww_liter_tag
           - input_number.heizung_heizkreis_kw
           - input_number.heizung_elwa_ziel_c
+      - type: entities
+        title: Schimmel heizen (Klima 11–18 Uhr)
+        show_header_toggle: false
+        entities:
+          - input_boolean.schimmel_heizen_buero
+          - input_boolean.schimmel_heizen_wohnen
+          - input_boolean.schimmel_heizen_schlafzimmer
+          - input_boolean.schimmel_heizen_schlafen_c
+          - input_datetime.schimmel_heizen_start
+          - input_datetime.schimmel_heizen_ende
+          - input_number.schimmel_heizen_c
+          - binary_sensor.schimmel_heizen_fenster
+          - binary_sensor.schimmel_heizen_aktiv_buero
+          - binary_sensor.schimmel_heizen_aktiv_wohnen
+          - binary_sensor.schimmel_heizen_aktiv_schlafzimmer
+          - binary_sensor.schimmel_heizen_aktiv_schlafen_c
