@@ -85,7 +85,7 @@ Short starts burn pellets. Failsafe and clear enable conditions beat endless tog
 Three stages:
 
 1. **Risk**: local from temp/RH (margin = room temp − dew point), classes like tado (`Critical` / `High` / `Medium` / `Low`). You can also use tado’s own risk sensors.
-2. **Ventilation advice**: compares indoor dew point to outdoor dew point (`weather.home`): ventilate, shock-ventilate, heat, or mixed.
+2. **Ventilation advice**: compares indoor dew point to `sensor.aussen_taupunkt` (Netatmo→DWD); cold thresholds use `sensor.aussen_temperatur` (ETA→Netatmo→DWD). Local vs DWD sync: `sensor.aussen_sensor_abgleich`.
 3. **Mold heat**: only in the configured time window, only when risk is elevated and outdoor air is *not* drier: `binary_sensor.schimmel_heizen_aktiv_*` raises the climate setpoint in the heating templates to `input_number.schimmel_heizen_c`.
 
 Without the mold packages, the heating setpoint templates simply never see those boost flags.

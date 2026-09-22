@@ -1,0 +1,249 @@
+title: Anlage
+views:
+  - title: Übersicht
+    path: uebersicht
+    icon: mdi:pipe
+    type: panel
+    cards:
+      - type: picture-elements
+        image: /local/eta/anlage_hydraulik_v2.svg?v=2
+        dark_mode_image: /local/eta/anlage_hydraulik_v2.svg?v=2
+        elements:
+          # FWM: bereit / Warmwasserzapfung / Zirkulation
+          - type: image
+            entity: sensor.heizung_fwm_status
+            image: /local/eta/fwm_bereit.png
+            state_image:
+              bereit: /local/eta/fwm_bereit.png
+              brauchwasser: /local/eta/fwm_brauchwasser.png
+              zirkulation: /local/eta/fwm_zirkulation.png
+            style:
+              left: 77.5%
+              top: 27.8%
+              width: 15%
+              transform: translate(-50%, -50%)
+            tap_action:
+              action: more-info
+
+          # ELWA: elektrischer PV-Heizstab, bewusst ohne Hydraulikkreis
+          - type: image
+            entity: binary_sensor.heizung_elwa_aktiv
+            image: /local/eta/pvm_aus.png
+            state_image:
+              "on": /local/eta/pvm_ein.png
+              "off": /local/eta/pvm_aus.png
+            style:
+              left: 52.8%
+              top: 74.5%
+              width: 10%
+              transform: translate(-50%, -50%)
+            tap_action:
+              action: more-info
+
+          # Heizkreis-Abgabe
+          - type: image
+            entity: binary_sensor.heizung_hk_pumpe_aktiv
+            image: /local/eta/radiator_aus.png
+            state_image:
+              "on": /local/eta/radiator_ein.png
+              "off": /local/eta/radiator_aus.png
+            style:
+              left: 88.2%
+              top: 66%
+              width: 9.5%
+              transform: translate(-50%, -50%)
+            tap_action:
+              action: more-info
+
+          # Kessel-Betriebsindikator
+          - type: image
+            entity: switch.kessel_sonstiges_ein_aus_taste
+            image: /local/eta/biomasse_aus.png
+            state_image:
+              "on": /local/eta/biomasse_ein.png
+              "off": /local/eta/biomasse_aus.png
+            style:
+              left: 21.8%
+              top: 62%
+              width: 8%
+              transform: translate(-50%, -50%)
+            tap_action:
+              action: more-info
+
+          # Puffer-Schichtung
+          - type: state-label
+            entity: sensor.pufferflex_eingange_fuhler_1_oben
+            style: &puffer_label
+              left: 43.6%
+              top: 31%
+              transform: translate(-50%, -50%)
+              color: "#ffffff"
+              font-family: Fira Sans, sans-serif
+              font-weight: 700
+              font-size: clamp(12px, 1.25vw, 20px)
+              text-shadow: 0 2px 5px rgba(0,0,0,0.95)
+              background: rgba(3,10,15,0.62)
+              border: 1px solid rgba(255,255,255,0.16)
+              padding: 4px 9px
+              border-radius: 7px
+
+          - type: state-label
+            entity: sensor.pufferflex_eingange_fuhler_2
+            style:
+              <<: *puffer_label
+              top: 47%
+
+          - type: state-label
+            entity: sensor.pufferflex_eingange_fuhler_3
+            style:
+              <<: *puffer_label
+              top: 63%
+
+          # FWM-Messwerte
+          - type: state-label
+            entity: sensor.wasser_warmwasser_warmwasser
+            prefix: "WW "
+            style: &process_label
+              left: 89%
+              top: 38%
+              transform: translate(-50%, -50%)
+              color: "#f8fafc"
+              font-family: Fira Sans, sans-serif
+              font-weight: 650
+              font-size: clamp(11px, 1vw, 16px)
+              text-shadow: 0 2px 4px rgba(0,0,0,0.95)
+              background: rgba(3,10,15,0.72)
+              border: 1px solid rgba(148,163,184,0.28)
+              padding: 4px 9px
+              border-radius: 7px
+
+          - type: state-label
+            entity: sensor.wasser_warmwasser_primar_vorlauf
+            prefix: "FWM VL "
+            style:
+              <<: *process_label
+              left: 65.8%
+              top: 29.5%
+              color: "#ff9a96"
+
+          - type: state-label
+            entity: sensor.wasser_warmwasser_primar_rucklauf
+            prefix: "FWM RL "
+            style:
+              <<: *process_label
+              left: 60.5%
+              top: 55.8%
+              color: "#8fc9ff"
+
+          - type: state-label
+            entity: sensor.heizung_fwm_status
+            prefix: "FWM "
+            style:
+              <<: *process_label
+              left: 77.5%
+              top: 43.5%
+
+          # Heizkreis
+          - type: state-label
+            entity: sensor.heizkreis_eingange_vorlauf
+            prefix: "HK VL "
+            style:
+              <<: *process_label
+              left: 72.5%
+              top: 57.5%
+              color: "#ff9a96"
+
+          - type: state-label
+            entity: sensor.heizkreis_ausgange_heizkreismischer_position
+            prefix: "Mischer "
+            suffix: "%"
+            style:
+              <<: *process_label
+              left: 66.5%
+              top: 67.5%
+
+          # ELWA / PV
+          - type: state-label
+            entity: sensor.ac_elwa_2_1_power_elwa_2
+            prefix: "ELWA "
+            style:
+              <<: *process_label
+              left: 52.8%
+              top: 91.5%
+              color: "#ffd966"
+
+          - type: state-label
+            entity: sensor.ac_elwa_2_1_temperatur_1
+            prefix: "Stab "
+            style:
+              <<: *process_label
+              left: 52.8%
+              top: 86.5%
+
+          - type: state-label
+            entity: sensor.openwb_controller_pv_leistung_gesamt
+            prefix: "PV "
+            style:
+              <<: *process_label
+              left: 66.2%
+              top: 92.5%
+              color: "#ffd966"
+
+          # Anlagenstatus
+          - type: state-label
+            entity: sensor.kessel_kessel
+            prefix: "Kessel "
+            style:
+              <<: *process_label
+              left: 21.7%
+              top: 72.5%
+              color: "#ffe36e"
+
+          - type: state-label
+            entity: sensor.aussen_temperatur
+            prefix: "Außen "
+            style:
+              <<: *process_label
+              left: 8.5%
+              top: 7.2%
+              color: "#9dd8ff"
+
+          - type: state-label
+            entity: sensor.heizung_puffer_prognose
+            prefix: "Puffer "
+            style:
+              <<: *process_label
+              left: 43.6%
+              top: 7.2%
+
+  - title: Werte
+    path: werte
+    icon: mdi:gauge
+    cards:
+      - type: entities
+        title: Puffer / Kessel / ELWA
+        entities:
+          - sensor.pufferflex_eingange_fuhler_1_oben
+          - sensor.pufferflex_eingange_fuhler_2
+          - sensor.pufferflex_eingange_fuhler_3
+          - sensor.heizung_puffer_prognose
+          - sensor.heizung_puffer_energie_ww
+          - sensor.heizung_puffer_energie_heizen
+          - switch.kessel_sonstiges_ein_aus_taste
+          - binary_sensor.heizung_elwa_aktiv
+          - sensor.ac_elwa_2_1_power_elwa_2
+          - sensor.ac_elwa_2_1_temperatur_1
+          - sensor.heizung_fwm_status
+          - sensor.wasser_warmwasser_warmwasser
+          - sensor.wasser_warmwasser_primar_vorlauf
+          - sensor.wasser_warmwasser_primar_rucklauf
+          - sensor.wasser_warmwasser_pufferpumpe
+          - binary_sensor.heizung_hk_pumpe_aktiv
+          - switch.heizkreis_sonstiges_ein_aus_taste
+          - sensor.heizkreis_eingange_vorlauf
+          - sensor.aussen_temperatur
+      - type: markdown
+        content: >-
+          **Hydraulik:** ETA-Kessel lädt den Puffer. Heizkreis und FWM sind getrennte Verbraucher. Das FWM bezieht Primärwärme oben und führt den abgekühlten Rücklauf unten zurück.
+          **Power-to-Heat:** myPV ELWA ist als elektrischer Einschraubheizer dargestellt – ohne fiktiven Hydraulikkreis.
+          Icons: ETA FUB-Originals (freigegeben für diese Installation).

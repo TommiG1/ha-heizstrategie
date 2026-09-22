@@ -7,14 +7,15 @@ script:
     max: 12
     sequence:
     - variables:
-        manual_active: '{{ (manual_timer | default("")) not in ["", none] and is_state(manual_timer, ''active'') }}'
+        manual_raw: '{{ (manual_timer | default("")) not in ["", none] and is_state(manual_timer, ''active'') }}'
+        manual_active: '{{ manual_raw | bool }}'
         aus: '{{ sperre | bool or soll in [''off'', ''unknown'', ''unavailable''] }}'
         braucht: '{{ (not (sperre | bool)) and soll not in [''off'', ''unknown'', ''unavailable''] and (state_attr(entity_id, ''current_temperature'') | float(99) < soll | float(20)) }}'
         idle_ok: '{% if entity_id in [''climate.wohnzimmer_2'', ''climate.esszimmer''] %}{% set w = ''binary_sensor.heizung_klima_wenig_wohnen'' %}{% elif entity_id in [''climate.schlafen_a'', ''climate.schlafen_b'', ''climate.schlafen_c''] %}{% set w = ''binary_sensor.heizung_klima_wenig_schlafen'' %}{% else %}{% set w = ''binary_sensor.heizung_klima_wenig_buero'' %}{% endif %}{% set sec = states(''input_number.heizung_klima_idle_min'') | int(20) * 60 %}{{ is_state(w, ''on'') and states[w] is not none and (now() - states[w].last_changed).total_seconds() >= sec }}'
     - choose:
       - conditions: '{{ manual_active | bool }}'
         sequence: []
-      - conditions: '{{ aus | bool }}'
+      - conditions: '{{ aus | bool and not is_state(entity_id, ''off'') }}'
         sequence:
         - action: climate.turn_off
           target:
@@ -36,7 +37,7 @@ script:
         - action: climate.turn_off
           target:
             entity_id: '{{ entity_id }}'
-      - conditions: '{{ is_state(entity_id, ''heat'') }}'
+      - conditions: '{{ is_state(entity_id, ''heat'') and (state_attr(entity_id, ''temperature'') | float(-99) != soll | float(20)) }}'
         sequence:
         - action: climate.set_temperature
           target:
@@ -52,7 +53,7 @@ script:
         aus: '{{ sperre | bool or soll in [''off'', ''unknown'', ''unavailable''] }}'
         braucht: '{{ (not (sperre | bool)) and soll not in [''off'', ''unknown'', ''unavailable''] and (state_attr(entity_id, ''current_temperature'') | float(99) < soll | float(20)) }}'
     - choose:
-      - conditions: '{{ aus | bool or not (braucht | bool) }}'
+      - conditions: '{{ (aus | bool or not (braucht | bool)) and not is_state(entity_id, ''off'') }}'
         sequence:
         - action: climate.turn_off
           target:
@@ -65,7 +66,7 @@ script:
           data:
             hvac_mode: heat
             temperature: '{{ soll | float(20) }}'
-      - conditions: '{{ is_state(entity_id, ''heat'') }}'
+      - conditions: '{{ is_state(entity_id, ''heat'') and (state_attr(entity_id, ''temperature'') | float(-99) != soll | float(20)) }}'
         sequence:
         - action: climate.set_temperature
           target:
@@ -111,7 +112,7 @@ script:
   heizung_tick:
     alias: Heizung Takt
     mode: queued
-    max: 2
+    max: 5
     sequence:
     - choose:
       - conditions: "{{ is_state('input_select.heizung_modus', 'Aus') }}"

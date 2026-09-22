@@ -16,7 +16,7 @@ automation:
     alias: Heizung Takt
     description: Wendet Sollwerte aus Helpern auf Klima, tado und ETA an. Bei Modus Aus Failsafe.
     mode: queued
-    max: 2
+    max: 10
     trigger:
       - platform: time_pattern
         minutes: "/1"
@@ -52,8 +52,9 @@ automation:
   - id: heizung_klima_manual_override
     alias: Heizung Klima Manual Override erkennen
     description: >-
-      Startet Override-Timer bei manuellem Nicht-Heizen oder Heat-Soll ungleich Strategie-Soll;
-      cancelt bei Aus oder Heat mit Strategie-Soll.
+      Bei manueller Klima-Änderung (UI/Fernbedienung) Override-Timer starten
+      (Dauer: input_number.heizung_klima_manual_h, Standard 4 h). Strategie-Schreibvorgänge
+      (input_boolean.heizung_klima_schreibe) werden ignoriert.
     mode: queued
     max: 12
     trigger:
@@ -80,48 +81,84 @@ automation:
         climate.schlafen_a: sensor.heizung_soll_schlafen_a
         climate.schlafen_b: sensor.heizung_soll_schlafen_b
         climate.schlafen_c: sensor.heizung_soll_schlafen_c
+      sperre_map:
+        climate.wohnzimmer_2: binary_sensor.heizung_sperre_wohnen
+        climate.esszimmer: binary_sensor.heizung_sperre_wohnen
+        climate.faikin_mqtt_hvac: binary_sensor.heizung_sperre_buero
+        climate.schlafen_a: binary_sensor.heizung_sperre_schlafen_a
+        climate.schlafen_b: binary_sensor.heizung_sperre_schlafen_b
+        climate.schlafen_c: binary_sensor.heizung_sperre_schlafen_c
       manual_timer: "{{ timer_map[trigger.entity_id] }}"
-      soll_entity: "{{ soll_map[trigger.entity_id] }}"
+      soll: "{{ states(soll_map[trigger.entity_id]) }}"
+      sperre: "{{ is_state(sperre_map[trigger.entity_id], 'on') }}"
+      erwartet_aus: "{{ sperre | bool or soll in ['off', 'unknown', 'unavailable'] }}"
+      braucht: >-
+        {{ (not (erwartet_aus | bool))
+           and (state_attr(trigger.entity_id, 'current_temperature') | float(99) < soll | float(20)) }}
       new_state: "{{ trigger.to_state.state }}"
       old_state: "{{ trigger.from_state.state if trigger.from_state else 'unknown' }}"
       new_temp: "{{ state_attr(trigger.entity_id, 'temperature') }}"
       old_temp: "{{ trigger.from_state.attributes.get('temperature') if trigger.from_state else none }}"
-      soll: "{{ states(soll_entity) }}"
-      temp_matches_soll: >-
-        {% set t = new_temp | float(-999) %}
-        {{ soll not in ['off', 'unknown', 'unavailable']
-           and t > -900
-           and ((t - (soll | float)) | abs) < 0.25 }}
+      passt_zur_strategie: >-
+        {% if erwartet_aus | bool %}{{ new_state == 'off' }}
+        {% elif braucht | bool %}{{ new_state == 'heat'
+           and (new_temp | float(-99)) == (soll | float(20)) }}
+        {% else %}{{ new_state == 'off' or (new_state == 'heat'
+           and (new_temp | float(-99)) == (soll | float(20))) }}{% endif %}
     condition:
+      - condition: state
+        entity_id: input_boolean.heizung_klima_auto
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.heizung_klima_schreibe
+        state: "off"
       - condition: template
         value_template: >-
           {{ trigger.to_state is not none
              and new_state not in ['unavailable', 'unknown']
-             and (old_state != new_state or (new_temp | string) != (old_temp | string)) }}
+             and (old_state != new_state or (new_temp | string) != (old_temp | string))
+             and trigger.to_state.context.parent_id is none
+             and not (passt_zur_strategie | bool)
+             and not is_state('input_select.heizung_modus', 'Aus') }}
     action:
-      - choose:
-          - conditions:
-              - condition: template
-                value_template: >-
-                  {{ ((new_state in ['fan_only', 'cool', 'dry', 'heat_cool'])
-                      or (new_state == 'heat' and not (temp_matches_soll | bool)))
-                     and is_state('input_boolean.heizung_klima_auto', 'on')
-                     and not is_state('input_select.heizung_modus', 'Aus') }}
-            sequence:
-              - action: timer.start
-                target:
-                  entity_id: "{{ manual_timer }}"
-                data:
-                  duration: "{{ (states('input_number.heizung_klima_manual_h') | float(4) * 3600) | int }}"
-          - conditions:
-              - condition: template
-                value_template: >-
-                  {{ new_state == 'off'
-                     or (new_state == 'heat' and (temp_matches_soll | bool)) }}
-            sequence:
-              - action: timer.cancel
-                target:
-                  entity_id: "{{ manual_timer }}"
+      - action: timer.start
+        target:
+          entity_id: "{{ manual_timer }}"
+        data:
+          duration: "{{ (states('input_number.heizung_klima_manual_h') | float(4) * 3600) | int }}"
+
+  - id: heizung_klima_schreibe_reset
+    alias: Heizung Klima Schreib-Guard zurücksetzen
+    description: >-
+      Setzt heizung_klima_schreibe 45 s nach Strategie-Schreiben zurück.
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: input_boolean.heizung_klima_schreibe
+        to: "on"
+    action:
+      - delay: "00:00:45"
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.heizung_klima_schreibe
+
+  - id: heizung_klima_schreibe_watchdog
+    alias: Heizung Klima Schreib-Guard Watchdog
+    description: >-
+      Fängt einen hängenden Schreib-Guard ab (z. B. Neustart während der 45 s),
+      damit der Manual-Override nicht dauerhaft blockiert bleibt.
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: input_boolean.heizung_klima_schreibe
+        to: "on"
+        for: "00:02:00"
+      - platform: homeassistant
+        event: start
+    action:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.heizung_klima_schreibe
 
   - id: heizung_fenster
     alias: Heizung Fenster Debounce

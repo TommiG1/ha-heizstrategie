@@ -1,0 +1,543 @@
+# Einsparungssensoren: Klima im Heizbetrieb + ELWA gegen ETA/Pellets.
+# Live-Einbindung (nicht ueber HA-packages, sondern separate Includes):
+#   - template:        includes/templates/heizung_einsparung.yaml (dieser Block)
+#   - input_number:    4 Helper ueber UI angelegt (siehe unten)
+#   - integration:     includes/sensors.yaml (Abschnitt "Einsparung Klima/ELWA")
+#   - utility_meter:   includes/utility_meter.yaml (Abschnitt "Einsparung Klima/ELWA")
+# Siehe ENTITY_MAP.md Abschnitt "Einsparung / Kosten" fuer die vollstaendige Entity-Zuordnung.
+#
+# WICHTIG: Bei Template-Sensoren ohne explizite entity_id-Angabe generiert HA die
+# entity_id aus dem slugifizierten "name" (NICHT aus unique_id!). Deshalb tragen
+# die Leistungssensoren hier absichtlich KEIN "_w"-Suffix in der entity_id, obwohl
+# unique_id und Kommentare "_w" verwenden (z. B. sensor.heizung_klima_heizleistung,
+# nicht sensor.heizung_klima_heizleistung_w). Alle internen Referenzen unten sowie
+# die source:-Angaben in sensors.yaml/utility_meter.yaml MUESSEN die tatsaechliche
+# entity_id (ohne "_w") verwenden.
+
+- binary_sensor:
+    - name: Heizung Klima Heizbetrieb
+      unique_id: heizung_klima_heizbetrieb
+      icon: mdi:air-conditioner
+      state: >-
+        {% set entities = ['climate.wohnzimmer_2', 'climate.esszimmer',
+           'climate.schlafen_a', 'climate.schlafen_b', 'climate.schlafen_c',
+           'climate.faikin_mqtt_hvac'] %}
+        {{ entities | select('is_state', 'heat') | list | count > 0 }}
+
+- sensor:
+    - name: Heizung Stromquellen Anteil
+      unique_id: heizung_stromquellen_anteil
+      unit_of_measurement: "%"
+      icon: mdi:transmission-tower
+      state: >-
+        {% set pv = states('sensor.e3dc_solar_power') | float(0) %}
+        {% set export = states('sensor.e3dc_grid_export_power') | float(0) %}
+        {% set akku = states('sensor.e3dc_battery_discharge_power') | float(0) %}
+        {% set netz = states('sensor.e3dc_grid_import_power') | float(0) %}
+        {% set pv_self = [pv - export, 0] | max %}
+        {% set total = pv_self + akku + netz %}
+        {{ ((netz / total) * 100 if total > 10 else 100) | round(0) }}
+      attributes:
+        pv_ratio: >-
+          {% set pv = states('sensor.e3dc_solar_power') | float(0) %}
+          {% set export = states('sensor.e3dc_grid_export_power') | float(0) %}
+          {% set akku = states('sensor.e3dc_battery_discharge_power') | float(0) %}
+          {% set netz = states('sensor.e3dc_grid_import_power') | float(0) %}
+          {% set pv_self = [pv - export, 0] | max %}
+          {% set total = pv_self + akku + netz %}
+          {{ (pv_self / total) if total > 10 else 0 }}
+        akku_ratio: >-
+          {% set pv = states('sensor.e3dc_solar_power') | float(0) %}
+          {% set export = states('sensor.e3dc_grid_export_power') | float(0) %}
+          {% set akku = states('sensor.e3dc_battery_discharge_power') | float(0) %}
+          {% set netz = states('sensor.e3dc_grid_import_power') | float(0) %}
+          {% set pv_self = [pv - export, 0] | max %}
+          {% set total = pv_self + akku + netz %}
+          {{ (akku / total) if total > 10 else 0 }}
+        netz_ratio: >-
+          {% set pv = states('sensor.e3dc_solar_power') | float(0) %}
+          {% set export = states('sensor.e3dc_grid_export_power') | float(0) %}
+          {% set akku = states('sensor.e3dc_battery_discharge_power') | float(0) %}
+          {% set netz = states('sensor.e3dc_grid_import_power') | float(0) %}
+          {% set pv_self = [pv - export, 0] | max %}
+          {% set total = pv_self + akku + netz %}
+          {{ (netz / total) if total > 10 else 1 }}
+        house_load_w: "{{ states('sensor.e3dc_power_consumption_house') | float(0) }}"
+
+    - name: Heizung Klima Heizleistung
+      unique_id: heizung_klima_heizleistung
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:air-conditioner
+      state: >-
+        {% if is_state('binary_sensor.heizung_klima_heizbetrieb', 'on') %}
+          {{ states('sensor.klimaanlagen_gesamtleistung') | float(0) }}
+        {% else %}0{% endif %}
+
+    - name: Heizung Klima Heizleistung PV
+      unique_id: heizung_klima_heizleistung_pv
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:solar-power
+      state: >-
+        {% set p = states('sensor.heizung_klima_heizleistung') | float(0) %}
+        {% set r = state_attr('sensor.heizung_stromquellen_anteil', 'pv_ratio') | float(0) %}
+        {{ (p * r) | round(1) }}
+
+    - name: Heizung Klima Heizleistung Akku
+      unique_id: heizung_klima_heizleistung_akku
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:battery-arrow-down
+      state: >-
+        {% set p = states('sensor.heizung_klima_heizleistung') | float(0) %}
+        {% set r = state_attr('sensor.heizung_stromquellen_anteil', 'akku_ratio') | float(0) %}
+        {{ (p * r) | round(1) }}
+
+    - name: Heizung Klima Heizleistung Netz
+      unique_id: heizung_klima_heizleistung_netz
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:transmission-tower
+      state: >-
+        {% set p = states('sensor.heizung_klima_heizleistung') | float(0) %}
+        {% set r = state_attr('sensor.heizung_stromquellen_anteil', 'netz_ratio') | float(0) %}
+        {{ (p * r) | round(1) }}
+
+    - name: Heizung Klima Waermeleistung
+      unique_id: heizung_klima_waermeleistung
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:radiator
+      state: >-
+        {% set p = states('sensor.heizung_klima_heizleistung') | float(0) %}
+        {% if p <= 0 %}0
+        {% else %}
+          {% set t = states('sensor.aussen_temperatur') | float(None) %}
+          {% if t is none %}{% set t = states('sensor.heizkreis_eingange_aussentemperatur') | float(7) %}{% endif %}
+          {% set slope = 0.157 if t >= -7 else 0.1 %}
+          {% set cop_datenblatt = 3 + slope * (t + 7) %}
+          {% set abschlag = states('input_number.heizung_einsparung_feldabschlag') | float(0.75) %}
+          {% set cop = [[cop_datenblatt * abschlag, 1.5] | max, 6.0] | min %}
+          {{ (p * cop) | round(1) }}
+        {% endif %}
+      attributes:
+        cop_feld: >-
+          {% set t = states('sensor.aussen_temperatur') | float(None) %}
+          {% if t is none %}{% set t = states('sensor.heizkreis_eingange_aussentemperatur') | float(7) %}{% endif %}
+          {% set slope = 0.157 if t >= -7 else 0.1 %}
+          {% set cop_datenblatt = 3 + slope * (t + 7) %}
+          {% set abschlag = states('input_number.heizung_einsparung_feldabschlag') | float(0.75) %}
+          {{ [[cop_datenblatt * abschlag, 1.5] | max, 6.0] | min | round(2) }}
+        modelliert: true
+
+    - name: Heizung ELWA Leistung PV
+      unique_id: heizung_elwa_leistung_pv
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:solar-power
+      state: "{{ states('sensor.elwa_api_solaranteil') | float(0) | round(1) }}"
+
+    - name: Heizung ELWA Leistung Akku
+      unique_id: heizung_elwa_leistung_akku
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:battery-arrow-down
+      state: >-
+        {% set rest = states('sensor.elwa_api_netzanteil') | float(0) %}
+        {% set akku_r = state_attr('sensor.heizung_stromquellen_anteil', 'akku_ratio') | float(0) %}
+        {% set netz_r = state_attr('sensor.heizung_stromquellen_anteil', 'netz_ratio') | float(0) %}
+        {% set summe = akku_r + netz_r %}
+        {% set anteil = (akku_r / summe) if summe > 0 else 0 %}
+        {{ (rest * anteil) | round(1) }}
+
+    - name: Heizung ELWA Leistung Netz
+      unique_id: heizung_elwa_leistung_netz
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      icon: mdi:transmission-tower
+      state: >-
+        {% set rest = states('sensor.elwa_api_netzanteil') | float(0) %}
+        {% set akku_r = state_attr('sensor.heizung_stromquellen_anteil', 'akku_ratio') | float(0) %}
+        {% set netz_r = state_attr('sensor.heizung_stromquellen_anteil', 'netz_ratio') | float(0) %}
+        {% set summe = akku_r + netz_r %}
+        {% set anteil = (netz_r / summe) if summe > 0 else 1 %}
+        {{ (rest * anteil) | round(1) }}
+
+    - name: Heizung Einsparung Klima Tag
+      unique_id: heizung_einsparung_klima_tag
+      unit_of_measurement: "kg"
+      icon: mdi:leaf
+      state: >-
+        {% set kwh = states('sensor.heizung_klima_waerme_kwh_tag') | float(0) %}
+        {% set heat_per_kg = states('input_number.heizung_einsparung_heat_per_kg') | float(5.2) %}
+        {{ (kwh / heat_per_kg) | round(2) if heat_per_kg > 0 else 0 }}
+      attributes:
+        elektrisch_kwh: >-
+          {{ (states('sensor.heizung_klima_pv_kwh_tag') | float(0)
+              + states('sensor.heizung_klima_akku_kwh_tag') | float(0)
+              + states('sensor.heizung_klima_netz_kwh_tag') | float(0)) | round(2) }}
+        waerme_kwh: "{{ states('sensor.heizung_klima_waerme_kwh_tag') | float(0) | round(2) }}"
+        pv_kwh: "{{ states('sensor.heizung_klima_pv_kwh_tag') | float(0) | round(2) }}"
+        akku_kwh: "{{ states('sensor.heizung_klima_akku_kwh_tag') | float(0) | round(2) }}"
+        netz_kwh: "{{ states('sensor.heizung_klima_netz_kwh_tag') | float(0) | round(2) }}"
+        pellet_wert_brutto_eur: >-
+          {% set kg = states('sensor.heizung_einsparung_klima_tag') | float(0) %}
+          {% set preis_t = states('sensor.pelletpreis_bayern') | float(430) %}
+          {{ (kg * preis_t / 1000) | round(2) }}
+        stromkosten_eur: >-
+          {% set pv = states('sensor.heizung_klima_pv_kwh_tag') | float(0) %}
+          {% set akku = states('sensor.heizung_klima_akku_kwh_tag') | float(0) %}
+          {% set netz = states('sensor.heizung_klima_netz_kwh_tag') | float(0) %}
+          {% set einspeise = states('input_number.heizung_einsparung_einspeiseverguetung_ct') | float(6.2) / 100 %}
+          {% set netzpreis = states('sensor.electricity_price') | float(states('input_number.heizung_einsparung_netzpreis_ct') | float(22.75) / 100) %}
+          {{ ((pv + akku) * einspeise + netz * netzpreis) | round(2) }}
+        netto_ersparnis_eur: >-
+          {% set kg = states('sensor.heizung_einsparung_klima_tag') | float(0) %}
+          {% set preis_t = states('sensor.pelletpreis_bayern') | float(430) %}
+          {% set brutto = kg * preis_t / 1000 %}
+          {% set pv = states('sensor.heizung_klima_pv_kwh_tag') | float(0) %}
+          {% set akku = states('sensor.heizung_klima_akku_kwh_tag') | float(0) %}
+          {% set netz = states('sensor.heizung_klima_netz_kwh_tag') | float(0) %}
+          {% set einspeise = states('input_number.heizung_einsparung_einspeiseverguetung_ct') | float(6.2) / 100 %}
+          {% set netzpreis = states('sensor.electricity_price') | float(states('input_number.heizung_einsparung_netzpreis_ct') | float(22.75) / 100) %}
+          {% set strom = (pv + akku) * einspeise + netz * netzpreis %}
+          {{ (brutto - strom) | round(2) }}
+        modelliert: "Klima-Waerme geschaetzt ueber Feld-COP-Kennlinie"
+
+    - name: Heizung Einsparung Klima Monat
+      unique_id: heizung_einsparung_klima_monat
+      unit_of_measurement: "kg"
+      icon: mdi:leaf
+      state: >-
+        {% set kwh = states('sensor.heizung_klima_waerme_kwh_monat') | float(0) %}
+        {% set heat_per_kg = states('input_number.heizung_einsparung_heat_per_kg') | float(5.2) %}
+        {{ (kwh / heat_per_kg) | round(2) if heat_per_kg > 0 else 0 }}
+      attributes:
+        elektrisch_kwh: >-
+          {{ (states('sensor.heizung_klima_pv_kwh_monat') | float(0)
+              + states('sensor.heizung_klima_akku_kwh_monat') | float(0)
+              + states('sensor.heizung_klima_netz_kwh_monat') | float(0)) | round(2) }}
+        waerme_kwh: "{{ states('sensor.heizung_klima_waerme_kwh_monat') | float(0) | round(2) }}"
+        pv_kwh: "{{ states('sensor.heizung_klima_pv_kwh_monat') | float(0) | round(2) }}"
+        akku_kwh: "{{ states('sensor.heizung_klima_akku_kwh_monat') | float(0) | round(2) }}"
+        netz_kwh: "{{ states('sensor.heizung_klima_netz_kwh_monat') | float(0) | round(2) }}"
+        pellet_wert_brutto_eur: >-
+          {% set kg = states('sensor.heizung_einsparung_klima_monat') | float(0) %}
+          {% set preis_t = states('sensor.pelletpreis_bayern') | float(430) %}
+          {{ (kg * preis_t / 1000) | round(2) }}
+        stromkosten_eur: >-
+          {% set pv = states('sensor.heizung_klima_pv_kwh_monat') | float(0) %}
+          {% set akku = states('sensor.heizung_klima_akku_kwh_monat') | float(0) %}
+          {% set netz = states('sensor.heizung_klima_netz_kwh_monat') | float(0) %}
+          {% set einspeise = states('input_number.heizung_einsparung_einspeiseverguetung_ct') | float(6.2) / 100 %}
+          {% set netzpreis = states('sensor.electricity_price') | float(states('input_number.heizung_einsparung_netzpreis_ct') | float(22.75) / 100) %}
+          {{ ((pv + akku) * einspeise + netz * netzpreis) | round(2) }}
+        netto_ersparnis_eur: >-
+          {% set kg = states('sensor.heizung_einsparung_klima_monat') | float(0) %}
+          {% set preis_t = states('sensor.pelletpreis_bayern') | float(430) %}
+          {% set brutto = kg * preis_t / 1000 %}
+          {% set pv = states('sensor.heizung_klima_pv_kwh_monat') | float(0) %}
+          {% set akku = states('sensor.heizung_klima_akku_kwh_monat') | float(0) %}
+          {% set netz = states('sensor.heizung_klima_netz_kwh_monat') | float(0) %}
+          {% set einspeise = states('input_number.heizung_einsparung_einspeiseverguetung_ct') | float(6.2) / 100 %}
+          {% set netzpreis = states('sensor.electricity_price') | float(states('input_number.heizung_einsparung_netzpreis_ct') | float(22.75) / 100) %}
+          {% set strom = (pv + akku) * einspeise + netz * netzpreis %}
+          {{ (brutto - strom) | round(2) }}
+        modelliert: "Klima-Waerme geschaetzt ueber Feld-COP-Kennlinie"
+
+    - name: Heizung Einsparung Klima Jahr
+      unique_id: heizung_einsparung_klima_jahr
+      unit_of_measurement: "kg"
+      icon: mdi:leaf
+      state: >-
+        {% set kwh = states('sensor.heizung_klima_waerme_kwh_jahr') | float(0) %}
+        {% set heat_per_kg = states('input_number.heizung_einsparung_heat_per_kg') | float(5.2) %}
+        {{ (kwh / heat_per_kg) | round(2) if heat_per_kg > 0 else 0 }}
+      attributes:
+        elektrisch_kwh: >-
+          {{ (states('sensor.heizung_klima_pv_kwh_jahr') | float(0)
+              + states('sensor.heizung_klima_akku_kwh_jahr') | float(0)
+              + states('sensor.heizung_klima_netz_kwh_jahr') | float(0)) | round(2) }}
+        waerme_kwh: "{{ states('sensor.heizung_klima_waerme_kwh_jahr') | float(0) | round(2) }}"
+        pv_kwh: "{{ states('sensor.heizung_klima_pv_kwh_jahr') | float(0) | round(2) }}"
+        akku_kwh: "{{ states('sensor.heizung_klima_akku_kwh_jahr') | float(0) | round(2) }}"
+        netz_kwh: "{{ states('sensor.heizung_klima_netz_kwh_jahr') | float(0) | round(2) }}"
+        pellet_wert_brutto_eur: >-
+          {% set kg = states('sensor.heizung_einsparung_klima_jahr') | float(0) %}
+          {% set preis_t = states('sensor.pelletpreis_bayern') | float(430) %}
+          {{ (kg * preis_t / 1000) | round(2) }}
+        stromkosten_eur: >-
+          {% set pv = states('sensor.heizung_klima_pv_kwh_jahr') | float(0) %}
+          {% set akku = states('sensor.heizung_klima_akku_kwh_jahr') | float(0) %}
+          {% set netz = states('sensor.heizung_klima_netz_kwh_jahr') | float(0) %}
+          {% set einspeise = states('input_number.heizung_einsparung_einspeiseverguetung_ct') | float(6.2) / 100 %}
+          {% set netzpreis = states('sensor.electricity_price') | float(states('input_number.heizung_einsparung_netzpreis_ct') | float(22.75) / 100) %}
+          {{ ((pv + akku) * einspeise + netz * netzpreis) | round(2) }}
+        netto_ersparnis_eur: >-
+          {% set kg = states('sensor.heizung_einsparung_klima_jahr') | float(0) %}
+          {% set preis_t = states('sensor.pelletpreis_bayern') | float(430) %}
+          {% set brutto = kg * preis_t / 1000 %}
+          {% set pv = states('sensor.heizung_klima_pv_kwh_jahr') | float(0) %}
+          {% set akku = states('sensor.heizung_klima_akku_kwh_jahr') | float(0) %}
+          {% set netz = states('sensor.heizung_klima_netz_kwh_jahr') | float(0) %}
+          {% set einspeise = states('input_number.heizung_einsparung_einspeiseverguetung_ct') | float(6.2) / 100 %}
+          {% set netzpreis = states('sensor.electricity_price') | float(states('input_number.heizung_einsparung_netzpreis_ct') | float(22.75) / 100) %}
+          {% set strom = (pv + akku) * einspeise + netz * netzpreis %}
+          {{ (brutto - strom) | round(2) }}
+        modelliert: "Klima-Waerme geschaetzt ueber Feld-COP-Kennlinie"
+
+    - name: Heizung Einsparung ELWA Tag
+      unique_id: heizung_einsparung_elwa_tag
+      unit_of_measurement: "kg"
+      icon: mdi:water-boiler
+      state: >-
+        {% set kwh = states('sensor.heizung_elwa_pv_kwh_tag') | float(0)
+              + states('sensor.heizung_elwa_akku_kwh_tag') | float(0)
+              + states('sensor.heizung_elwa_netz_kwh_tag') | float(0) %}
+        {% set heat_per_kg = states('input_number.heizung_einsparung_heat_per_kg') | float(5.2) %}
+        {{ (kwh / heat_per_kg) | round(2) if heat_per_kg > 0 else 0 }}
+      attributes:
+        elektrisch_kwh: >-
+          {{ (states('sensor.heizung_elwa_pv_kwh_tag') | float(0)
+              + states('sensor.heizung_elwa_akku_kwh_tag') | float(0)
+              + states('sensor.heizung_elwa_netz_kwh_tag') | float(0)) | round(2) }}
+        pv_kwh: "{{ states('sensor.heizung_elwa_pv_kwh_tag') | float(0) | round(2) }}"
+        akku_kwh: "{{ states('sensor.heizung_elwa_akku_kwh_tag') | float(0) | round(2) }}"
+        netz_kwh: "{{ states('sensor.heizung_elwa_netz_kwh_tag') | float(0) | round(2) }}"
+        pellet_wert_brutto_eur: >-
+          {% set kg = states('sensor.heizung_einsparung_elwa_tag') | float(0) %}
+          {% set preis_t = states('sensor.pelletpreis_bayern') | float(430) %}
+          {{ (kg * preis_t / 1000) | round(2) }}
+        stromkosten_eur: >-
+          {% set pv = states('sensor.heizung_elwa_pv_kwh_tag') | float(0) %}
+          {% set akku = states('sensor.heizung_elwa_akku_kwh_tag') | float(0) %}
+          {% set netz = states('sensor.heizung_elwa_netz_kwh_tag') | float(0) %}
+          {% set einspeise = states('input_number.heizung_einsparung_einspeiseverguetung_ct') | float(6.2) / 100 %}
+          {% set netzpreis = states('sensor.electricity_price') | float(states('input_number.heizung_einsparung_netzpreis_ct') | float(22.75) / 100) %}
+          {{ ((pv + akku) * einspeise + netz * netzpreis) | round(2) }}
+        netto_ersparnis_eur: >-
+          {% set kg = states('sensor.heizung_einsparung_elwa_tag') | float(0) %}
+          {% set preis_t = states('sensor.pelletpreis_bayern') | float(430) %}
+          {% set brutto = kg * preis_t / 1000 %}
+          {% set pv = states('sensor.heizung_elwa_pv_kwh_tag') | float(0) %}
+          {% set akku = states('sensor.heizung_elwa_akku_kwh_tag') | float(0) %}
+          {% set netz = states('sensor.heizung_elwa_netz_kwh_tag') | float(0) %}
+          {% set einspeise = states('input_number.heizung_einsparung_einspeiseverguetung_ct') | float(6.2) / 100 %}
+          {% set netzpreis = states('sensor.electricity_price') | float(states('input_number.heizung_einsparung_netzpreis_ct') | float(22.75) / 100) %}
+          {% set strom = (pv + akku) * einspeise + netz * netzpreis %}
+          {{ (brutto - strom) | round(2) }}
+        modelliert: "ELWA-Waerme = ELWA-Strom (COP 1)"
+
+    - name: Heizung Einsparung ELWA Monat
+      unique_id: heizung_einsparung_elwa_monat
+      unit_of_measurement: "kg"
+      icon: mdi:water-boiler
+      state: >-
+        {% set kwh = states('sensor.heizung_elwa_pv_kwh_monat') | float(0)
+              + states('sensor.heizung_elwa_akku_kwh_monat') | float(0)
+              + states('sensor.heizung_elwa_netz_kwh_monat') | float(0) %}
+        {% set heat_per_kg = states('input_number.heizung_einsparung_heat_per_kg') | float(5.2) %}
+        {{ (kwh / heat_per_kg) | round(2) if heat_per_kg > 0 else 0 }}
+      attributes:
+        elektrisch_kwh: >-
+          {{ (states('sensor.heizung_elwa_pv_kwh_monat') | float(0)
+              + states('sensor.heizung_elwa_akku_kwh_monat') | float(0)
+              + states('sensor.heizung_elwa_netz_kwh_monat') | float(0)) | round(2) }}
+        pv_kwh: "{{ states('sensor.heizung_elwa_pv_kwh_monat') | float(0) | round(2) }}"
+        akku_kwh: "{{ states('sensor.heizung_elwa_akku_kwh_monat') | float(0) | round(2) }}"
+        netz_kwh: "{{ states('sensor.heizung_elwa_netz_kwh_monat') | float(0) | round(2) }}"
+        pellet_wert_brutto_eur: >-
+          {% set kg = states('sensor.heizung_einsparung_elwa_monat') | float(0) %}
+          {% set preis_t = states('sensor.pelletpreis_bayern') | float(430) %}
+          {{ (kg * preis_t / 1000) | round(2) }}
+        stromkosten_eur: >-
+          {% set pv = states('sensor.heizung_elwa_pv_kwh_monat') | float(0) %}
+          {% set akku = states('sensor.heizung_elwa_akku_kwh_monat') | float(0) %}
+          {% set netz = states('sensor.heizung_elwa_netz_kwh_monat') | float(0) %}
+          {% set einspeise = states('input_number.heizung_einsparung_einspeiseverguetung_ct') | float(6.2) / 100 %}
+          {% set netzpreis = states('sensor.electricity_price') | float(states('input_number.heizung_einsparung_netzpreis_ct') | float(22.75) / 100) %}
+          {{ ((pv + akku) * einspeise + netz * netzpreis) | round(2) }}
+        netto_ersparnis_eur: >-
+          {% set kg = states('sensor.heizung_einsparung_elwa_monat') | float(0) %}
+          {% set preis_t = states('sensor.pelletpreis_bayern') | float(430) %}
+          {% set brutto = kg * preis_t / 1000 %}
+          {% set pv = states('sensor.heizung_elwa_pv_kwh_monat') | float(0) %}
+          {% set akku = states('sensor.heizung_elwa_akku_kwh_monat') | float(0) %}
+          {% set netz = states('sensor.heizung_elwa_netz_kwh_monat') | float(0) %}
+          {% set einspeise = states('input_number.heizung_einsparung_einspeiseverguetung_ct') | float(6.2) / 100 %}
+          {% set netzpreis = states('sensor.electricity_price') | float(states('input_number.heizung_einsparung_netzpreis_ct') | float(22.75) / 100) %}
+          {% set strom = (pv + akku) * einspeise + netz * netzpreis %}
+          {{ (brutto - strom) | round(2) }}
+        modelliert: "ELWA-Waerme = ELWA-Strom (COP 1)"
+
+    - name: Heizung Einsparung ELWA Jahr
+      unique_id: heizung_einsparung_elwa_jahr
+      unit_of_measurement: "kg"
+      icon: mdi:water-boiler
+      state: >-
+        {% set kwh = states('sensor.heizung_elwa_pv_kwh_jahr') | float(0)
+              + states('sensor.heizung_elwa_akku_kwh_jahr') | float(0)
+              + states('sensor.heizung_elwa_netz_kwh_jahr') | float(0) %}
+        {% set heat_per_kg = states('input_number.heizung_einsparung_heat_per_kg') | float(5.2) %}
+        {{ (kwh / heat_per_kg) | round(2) if heat_per_kg > 0 else 0 }}
+      attributes:
+        elektrisch_kwh: >-
+          {{ (states('sensor.heizung_elwa_pv_kwh_jahr') | float(0)
+              + states('sensor.heizung_elwa_akku_kwh_jahr') | float(0)
+              + states('sensor.heizung_elwa_netz_kwh_jahr') | float(0)) | round(2) }}
+        pv_kwh: "{{ states('sensor.heizung_elwa_pv_kwh_jahr') | float(0) | round(2) }}"
+        akku_kwh: "{{ states('sensor.heizung_elwa_akku_kwh_jahr') | float(0) | round(2) }}"
+        netz_kwh: "{{ states('sensor.heizung_elwa_netz_kwh_jahr') | float(0) | round(2) }}"
+        pellet_wert_brutto_eur: >-
+          {% set kg = states('sensor.heizung_einsparung_elwa_jahr') | float(0) %}
+          {% set preis_t = states('sensor.pelletpreis_bayern') | float(430) %}
+          {{ (kg * preis_t / 1000) | round(2) }}
+        stromkosten_eur: >-
+          {% set pv = states('sensor.heizung_elwa_pv_kwh_jahr') | float(0) %}
+          {% set akku = states('sensor.heizung_elwa_akku_kwh_jahr') | float(0) %}
+          {% set netz = states('sensor.heizung_elwa_netz_kwh_jahr') | float(0) %}
+          {% set einspeise = states('input_number.heizung_einsparung_einspeiseverguetung_ct') | float(6.2) / 100 %}
+          {% set netzpreis = states('sensor.electricity_price') | float(states('input_number.heizung_einsparung_netzpreis_ct') | float(22.75) / 100) %}
+          {{ ((pv + akku) * einspeise + netz * netzpreis) | round(2) }}
+        netto_ersparnis_eur: >-
+          {% set kg = states('sensor.heizung_einsparung_elwa_jahr') | float(0) %}
+          {% set preis_t = states('sensor.pelletpreis_bayern') | float(430) %}
+          {% set brutto = kg * preis_t / 1000 %}
+          {% set pv = states('sensor.heizung_elwa_pv_kwh_jahr') | float(0) %}
+          {% set akku = states('sensor.heizung_elwa_akku_kwh_jahr') | float(0) %}
+          {% set netz = states('sensor.heizung_elwa_netz_kwh_jahr') | float(0) %}
+          {% set einspeise = states('input_number.heizung_einsparung_einspeiseverguetung_ct') | float(6.2) / 100 %}
+          {% set netzpreis = states('sensor.electricity_price') | float(states('input_number.heizung_einsparung_netzpreis_ct') | float(22.75) / 100) %}
+          {% set strom = (pv + akku) * einspeise + netz * netzpreis %}
+          {{ (brutto - strom) | round(2) }}
+        modelliert: "ELWA-Waerme = ELWA-Strom (COP 1)"
+
+    - name: Heizung Einsparung Gesamt Tag
+      unique_id: heizung_einsparung_gesamt_tag
+      unit_of_measurement: "kg"
+      icon: mdi:leaf-circle
+      state: >-
+        {{ (states('sensor.heizung_einsparung_klima_tag') | float(0)
+            + states('sensor.heizung_einsparung_elwa_tag') | float(0)) | round(2) }}
+      attributes:
+        pellet_wert_brutto_eur: >-
+          {{ (state_attr('sensor.heizung_einsparung_klima_tag', 'pellet_wert_brutto_eur') | float(0)
+              + state_attr('sensor.heizung_einsparung_elwa_tag', 'pellet_wert_brutto_eur') | float(0)) | round(2) }}
+        stromkosten_eur: >-
+          {{ (state_attr('sensor.heizung_einsparung_klima_tag', 'stromkosten_eur') | float(0)
+              + state_attr('sensor.heizung_einsparung_elwa_tag', 'stromkosten_eur') | float(0)) | round(2) }}
+        netto_ersparnis_eur: >-
+          {{ (state_attr('sensor.heizung_einsparung_klima_tag', 'netto_ersparnis_eur') | float(0)
+              + state_attr('sensor.heizung_einsparung_elwa_tag', 'netto_ersparnis_eur') | float(0)) | round(2) }}
+        klima_kg: "{{ states('sensor.heizung_einsparung_klima_tag') | float(0) }}"
+        elwa_kg: "{{ states('sensor.heizung_einsparung_elwa_tag') | float(0) }}"
+
+    - name: Heizung Einsparung Gesamt Monat
+      unique_id: heizung_einsparung_gesamt_monat
+      unit_of_measurement: "kg"
+      icon: mdi:leaf-circle
+      state: >-
+        {{ (states('sensor.heizung_einsparung_klima_monat') | float(0)
+            + states('sensor.heizung_einsparung_elwa_monat') | float(0)) | round(2) }}
+      attributes:
+        pellet_wert_brutto_eur: >-
+          {{ (state_attr('sensor.heizung_einsparung_klima_monat', 'pellet_wert_brutto_eur') | float(0)
+              + state_attr('sensor.heizung_einsparung_elwa_monat', 'pellet_wert_brutto_eur') | float(0)) | round(2) }}
+        stromkosten_eur: >-
+          {{ (state_attr('sensor.heizung_einsparung_klima_monat', 'stromkosten_eur') | float(0)
+              + state_attr('sensor.heizung_einsparung_elwa_monat', 'stromkosten_eur') | float(0)) | round(2) }}
+        netto_ersparnis_eur: >-
+          {{ (state_attr('sensor.heizung_einsparung_klima_monat', 'netto_ersparnis_eur') | float(0)
+              + state_attr('sensor.heizung_einsparung_elwa_monat', 'netto_ersparnis_eur') | float(0)) | round(2) }}
+        klima_kg: "{{ states('sensor.heizung_einsparung_klima_monat') | float(0) }}"
+        elwa_kg: "{{ states('sensor.heizung_einsparung_elwa_monat') | float(0) }}"
+
+    - name: Heizung Einsparung Gesamt Jahr
+      unique_id: heizung_einsparung_gesamt_jahr
+      unit_of_measurement: "kg"
+      icon: mdi:leaf-circle
+      state: >-
+        {{ (states('sensor.heizung_einsparung_klima_jahr') | float(0)
+            + states('sensor.heizung_einsparung_elwa_jahr') | float(0)) | round(2) }}
+      attributes:
+        pellet_wert_brutto_eur: >-
+          {{ (state_attr('sensor.heizung_einsparung_klima_jahr', 'pellet_wert_brutto_eur') | float(0)
+              + state_attr('sensor.heizung_einsparung_elwa_jahr', 'pellet_wert_brutto_eur') | float(0)) | round(2) }}
+        stromkosten_eur: >-
+          {{ (state_attr('sensor.heizung_einsparung_klima_jahr', 'stromkosten_eur') | float(0)
+              + state_attr('sensor.heizung_einsparung_elwa_jahr', 'stromkosten_eur') | float(0)) | round(2) }}
+        netto_ersparnis_eur: >-
+          {{ (state_attr('sensor.heizung_einsparung_klima_jahr', 'netto_ersparnis_eur') | float(0)
+              + state_attr('sensor.heizung_einsparung_elwa_jahr', 'netto_ersparnis_eur') | float(0)) | round(2) }}
+        klima_kg: "{{ states('sensor.heizung_einsparung_klima_jahr') | float(0) }}"
+        elwa_kg: "{{ states('sensor.heizung_einsparung_elwa_jahr') | float(0) }}"
+
+
+# =====================================
+# Referenz: includes/sensors.yaml (Integration/Riemann, live deployed)
+# =====================================
+#
+# - platform: integration
+#   source: sensor.heizung_klima_waermeleistung
+#   name: Heizung Klima Waerme
+#   unit_prefix: k
+#   round: 3
+#
+# - platform: integration
+#   source: sensor.heizung_klima_heizleistung_pv
+#   name: Heizung Klima PV Energie
+#   unit_prefix: k
+#   round: 3
+#
+# - platform: integration
+#   source: sensor.heizung_klima_heizleistung_akku
+#   name: Heizung Klima Akku Energie
+#   unit_prefix: k
+#   round: 3
+#
+# - platform: integration
+#   source: sensor.heizung_klima_heizleistung_netz
+#   name: Heizung Klima Netz Energie
+#   unit_prefix: k
+#   round: 3
+#
+# - platform: integration
+#   source: sensor.heizung_elwa_leistung_pv
+#   name: Heizung ELWA PV Energie
+#   unit_prefix: k
+#   round: 3
+#
+# - platform: integration
+#   source: sensor.heizung_elwa_leistung_akku
+#   name: Heizung ELWA Akku Energie
+#   unit_prefix: k
+#   round: 3
+#
+# - platform: integration
+#   source: sensor.heizung_elwa_leistung_netz
+#   name: Heizung ELWA Netz Energie
+#   unit_prefix: k
+#   round: 3
+#
+# =====================================
+# Referenz: includes/utility_meter.yaml (daily/monthly/yearly, live deployed)
+# =====================================
+#
+# heizung_klima_waerme_kwh_{tag,monat,jahr}:  source: sensor.heizung_klima_waerme
+# heizung_klima_pv_kwh_{tag,monat,jahr}:      source: sensor.heizung_klima_pv_energie
+# heizung_klima_akku_kwh_{tag,monat,jahr}:    source: sensor.heizung_klima_akku_energie
+# heizung_klima_netz_kwh_{tag,monat,jahr}:    source: sensor.heizung_klima_netz_energie
+# heizung_elwa_pv_kwh_{tag,monat,jahr}:       source: sensor.heizung_elwa_pv_energie
+# heizung_elwa_akku_kwh_{tag,monat,jahr}:     source: sensor.heizung_elwa_akku_energie
+# heizung_elwa_netz_kwh_{tag,monat,jahr}:     source: sensor.heizung_elwa_netz_energie
+#
+# cycle: daily -> "_tag", monthly -> "_monat", yearly -> "_jahr" (name analog).

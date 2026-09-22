@@ -6,6 +6,10 @@ input_boolean:
     name: Klima automatisch
     icon: mdi:air-conditioner
     initial: true
+  heizung_klima_schreibe:
+    name: Klima Strategie schreibt
+    icon: mdi:pencil-lock
+    initial: false
   heizung_tado_auto:
     name: tado automatisch
     icon: mdi:radiator
@@ -352,6 +356,14 @@ input_select:
   heizung_away_buero:
     name: Away Büro
     icon: mdi:desk
+    options:
+      - Auto
+      - Away
+      - Home
+    initial: Auto
+  heizung_away_spielzimmer:
+    name: Away Spielzimmer
+    icon: mdi:teddy-bear
     options:
       - Auto
       - Away

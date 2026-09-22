@@ -1,0 +1,172 @@
+# Außenwetter: lokale Sensoren + DWD-Fallback + Abgleich
+# Temperatur-Priorität: ETA (Norden) → Netatmo Terrasse → DWD nearest station
+# Feuchte/Taupunkt: Netatmo Terrasse (T+RH) → DWD nearest station (T+RH)
+# Abgleich: lokale Werte vs. DWD-Station (stündlich, kann nachlaufen).
+- sensor:
+    - name: Außen Temperatur
+      unique_id: aussen_temperatur
+      default_entity_id: sensor.aussen_temperatur
+      unit_of_measurement: "°C"
+      device_class: temperature
+      state_class: measurement
+      icon: mdi:thermometer
+      availability: >-
+        {{ states('sensor.heizkreis_eingange_aussentemperatur') not in ['unknown', 'unavailable', '']
+           or states('sensor.netatmo_terrasse_temperatur') not in ['unknown', 'unavailable', '']
+           or state_attr('weather.dwd_station', 'temperature') is number }}
+      state: >-
+        {% set eta = states('sensor.heizkreis_eingange_aussentemperatur') | float(none) %}
+        {% set net = states('sensor.netatmo_terrasse_temperatur') | float(none) %}
+        {% set dwd = state_attr('weather.dwd_station', 'temperature') | float(none) %}
+        {% if eta is not none %}
+          {{ eta | round(1) }}
+        {% elif net is not none %}
+          {{ net | round(1) }}
+        {% elif dwd is not none %}
+          {{ dwd | round(1) }}
+        {% else %}
+          unavailable
+        {% endif %}
+      attributes:
+        source: >-
+          {% set eta = states('sensor.heizkreis_eingange_aussentemperatur') | float(none) %}
+          {% set net = states('sensor.netatmo_terrasse_temperatur') | float(none) %}
+          {% set dwd = state_attr('weather.dwd_station', 'temperature') | float(none) %}
+          {% if eta is not none %}eta{% elif net is not none %}netatmo_terrasse{% elif dwd is not none %}dwd_station{% else %}none{% endif %}
+        temperature_eta: "{{ states('sensor.heizkreis_eingange_aussentemperatur') | float(none) }}"
+        temperature_netatmo: "{{ states('sensor.netatmo_terrasse_temperatur') | float(none) }}"
+        temperature_dwd: "{{ state_attr('weather.dwd_station', 'temperature') | float(none) }}"
+
+    - name: Außen Feuchtigkeit
+      unique_id: aussen_feuchtigkeit
+      default_entity_id: sensor.aussen_feuchtigkeit
+      unit_of_measurement: "%"
+      device_class: humidity
+      state_class: measurement
+      icon: mdi:water-percent
+      availability: >-
+        {{ states('sensor.netatmo_terrasse_luftfeuchtigkeit') not in ['unknown', 'unavailable', '']
+           or state_attr('weather.dwd_station', 'humidity') is number }}
+      state: >-
+        {% set net = states('sensor.netatmo_terrasse_luftfeuchtigkeit') | float(none) %}
+        {% set dwd = state_attr('weather.dwd_station', 'humidity') | float(none) %}
+        {% if net is not none %}
+          {{ net | round(0) }}
+        {% elif dwd is not none %}
+          {{ dwd | round(0) }}
+        {% else %}
+          unavailable
+        {% endif %}
+      attributes:
+        source: >-
+          {% set net = states('sensor.netatmo_terrasse_luftfeuchtigkeit') | float(none) %}
+          {% set dwd = state_attr('weather.dwd_station', 'humidity') | float(none) %}
+          {% if net is not none %}netatmo_terrasse{% elif dwd is not none %}dwd_station{% else %}none{% endif %}
+        humidity_netatmo: "{{ states('sensor.netatmo_terrasse_luftfeuchtigkeit') | float(none) }}"
+        humidity_dwd: "{{ state_attr('weather.dwd_station', 'humidity') | float(none) }}"
+
+    - name: Außen Taupunkt
+      unique_id: aussen_taupunkt
+      default_entity_id: sensor.aussen_taupunkt
+      unit_of_measurement: "°C"
+      device_class: temperature
+      state_class: measurement
+      icon: mdi:water-thermometer
+      availability: >-
+        {{ (states('sensor.netatmo_terrasse_temperatur') not in ['unknown', 'unavailable', '']
+            and states('sensor.netatmo_terrasse_luftfeuchtigkeit') not in ['unknown', 'unavailable', ''])
+           or (state_attr('weather.dwd_station', 'temperature') is number
+               and state_attr('weather.dwd_station', 'humidity') is number) }}
+      state: >-
+        {% set t_n = states('sensor.netatmo_terrasse_temperatur') | float(none) %}
+        {% set rh_n = states('sensor.netatmo_terrasse_luftfeuchtigkeit') | float(none) %}
+        {% set t_d = state_attr('weather.dwd_station', 'temperature') | float(none) %}
+        {% set rh_d = state_attr('weather.dwd_station', 'humidity') | float(none) %}
+        {% set use_net = t_n is not none and rh_n is not none and rh_n > 0 %}
+        {% set use_dwd = t_d is not none and rh_d is not none and rh_d > 0 %}
+        {% set t = t_n if use_net else (t_d if use_dwd else none) %}
+        {% set rh = rh_n if use_net else (rh_d if use_dwd else none) %}
+        {% if t is none or rh is none %}
+          unavailable
+        {% else %}
+          {% set gamma = (rh / 100) | log + (17.62 * t) / (243.12 + t) %}
+          {{ ((243.12 * gamma) / (17.62 - gamma)) | round(1) }}
+        {% endif %}
+      attributes:
+        source: >-
+          {% set t_n = states('sensor.netatmo_terrasse_temperatur') | float(none) %}
+          {% set rh_n = states('sensor.netatmo_terrasse_luftfeuchtigkeit') | float(none) %}
+          {% if t_n is not none and rh_n is not none and rh_n > 0 %}netatmo_terrasse{% else %}dwd_station{% endif %}
+        temperature_netatmo: "{{ states('sensor.netatmo_terrasse_temperatur') | float(none) }}"
+        humidity_netatmo: "{{ states('sensor.netatmo_terrasse_luftfeuchtigkeit') | float(none) }}"
+        temperature_dwd: "{{ state_attr('weather.dwd_station', 'temperature') | float(none) }}"
+        humidity_dwd: "{{ state_attr('weather.dwd_station', 'humidity') | float(none) }}"
+        temperature_eta: "{{ states('sensor.heizkreis_eingange_aussentemperatur') | float(none) }}"
+
+    - name: Außen Sensor Abgleich
+      unique_id: aussen_sensor_abgleich
+      default_entity_id: sensor.aussen_sensor_abgleich
+      icon: mdi:compare
+      availability: >-
+        {{ state_attr('weather.dwd_station', 'temperature') is number
+           or states('sensor.heizkreis_eingange_aussentemperatur') not in ['unknown', 'unavailable', '']
+           or states('sensor.netatmo_terrasse_temperatur') not in ['unknown', 'unavailable', ''] }}
+      state: >-
+        {% set eta = states('sensor.heizkreis_eingange_aussentemperatur') | float(none) %}
+        {% set net = states('sensor.netatmo_terrasse_temperatur') | float(none) %}
+        {% set dwd = state_attr('weather.dwd_station', 'temperature') | float(none) %}
+        {% set rh_n = states('sensor.netatmo_terrasse_luftfeuchtigkeit') | float(none) %}
+        {% set rh_d = state_attr('weather.dwd_station', 'humidity') | float(none) %}
+        {% set d_eta = (eta - dwd) | abs if eta is not none and dwd is not none else none %}
+        {% set d_net = (net - dwd) | abs if net is not none and dwd is not none else none %}
+        {% set d_rh = (rh_n - rh_d) | abs if rh_n is not none and rh_d is not none else none %}
+        {% set fail = (d_eta is not none and d_eta > 8)
+                   or (d_net is not none and d_net > 10)
+                   or (d_rh is not none and d_rh > 25) %}
+        {% set warn = (d_eta is not none and d_eta > 5)
+                   or (d_net is not none and d_net > 5)
+                   or (d_rh is not none and d_rh > 15) %}
+        {% if dwd is none and (eta is not none or net is not none) %}
+          teilweise
+        {% elif eta is none and net is none and dwd is not none %}
+          nur_dwd
+        {% elif fail %}
+          ungueltig
+        {% elif warn %}
+          warnung
+        {% elif dwd is not none and (eta is not none or net is not none) %}
+          ok
+        {% else %}
+          unbekannt
+        {% endif %}
+      attributes:
+        summary: >-
+          {% set eta = states('sensor.heizkreis_eingange_aussentemperatur') | float(none) %}
+          {% set net = states('sensor.netatmo_terrasse_temperatur') | float(none) %}
+          {% set dwd = state_attr('weather.dwd_station', 'temperature') | float(none) %}
+          {% set rh_n = states('sensor.netatmo_terrasse_luftfeuchtigkeit') | float(none) %}
+          {% set rh_d = state_attr('weather.dwd_station', 'humidity') | float(none) %}
+          {% set d_eta = ((eta - dwd) | round(1)) if eta is not none and dwd is not none else '—' %}
+          {% set d_net = ((net - dwd) | round(1)) if net is not none and dwd is not none else '—' %}
+          {% set d_rh = ((rh_n - rh_d) | round(0)) if rh_n is not none and rh_d is not none else '—' %}
+          ETA {{ eta if eta is not none else '—' }} · Netatmo {{ net if net is not none else '—' }} · DWD {{ dwd if dwd is not none else '—' }} °C · ΔETA {{ d_eta }} K · ΔNetatmo {{ d_net }} K · ΔRH {{ d_rh }} pp
+        delta_eta_dwd: >-
+          {% set eta = states('sensor.heizkreis_eingange_aussentemperatur') | float(none) %}
+          {% set dwd = state_attr('weather.dwd_station', 'temperature') | float(none) %}
+          {{ ((eta - dwd) | round(1)) if eta is not none and dwd is not none else none }}
+        delta_netatmo_dwd: >-
+          {% set net = states('sensor.netatmo_terrasse_temperatur') | float(none) %}
+          {% set dwd = state_attr('weather.dwd_station', 'temperature') | float(none) %}
+          {{ ((net - dwd) | round(1)) if net is not none and dwd is not none else none }}
+        delta_rh_netatmo_dwd: >-
+          {% set rh_n = states('sensor.netatmo_terrasse_luftfeuchtigkeit') | float(none) %}
+          {% set rh_d = state_attr('weather.dwd_station', 'humidity') | float(none) %}
+          {{ ((rh_n - rh_d) | round(0)) if rh_n is not none and rh_d is not none else none }}
+        temperature_eta: "{{ states('sensor.heizkreis_eingange_aussentemperatur') | float(none) }}"
+        temperature_netatmo: "{{ states('sensor.netatmo_terrasse_temperatur') | float(none) }}"
+        temperature_dwd: "{{ state_attr('weather.dwd_station', 'temperature') | float(none) }}"
+        humidity_netatmo: "{{ states('sensor.netatmo_terrasse_luftfeuchtigkeit') | float(none) }}"
+        humidity_dwd: "{{ state_attr('weather.dwd_station', 'humidity') | float(none) }}"
+        dwd_report_time: "{{ state_attr('weather.dwd_station', 'report_time') }}"
+        thresholds: "ETA±5/8 K · Netatmo±5/10 K · RH±15/25 pp vs DWD"
+        note: "Netatmo Südseite kann tagsüber bewusst wärmer sein als ETA/DWD; ETA Norden ist Referenz für Entscheidungen."

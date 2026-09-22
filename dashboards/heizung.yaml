@@ -63,6 +63,53 @@ views:
           - sensor.e3dc_battery_state_of_charge
           - sensor.solcast_pv_forecast_prognose_heute
           - sensor.e3dc_maestro_forecast_netzbezug_nachste_24h
+      - type: markdown
+        title: Einsparung Klima + ELWA vs. Pellets
+        content: >-
+          |  | kg | Brutto € | Stromkosten € | Netto € |
+          |---|---:|---:|---:|---:|
+          | **Heute** | {{ states('sensor.heizung_einsparung_gesamt_tag') }} |
+          {{ state_attr('sensor.heizung_einsparung_gesamt_tag', 'pellet_wert_brutto_eur') }} |
+          {{ state_attr('sensor.heizung_einsparung_gesamt_tag', 'stromkosten_eur') }} |
+          {{ state_attr('sensor.heizung_einsparung_gesamt_tag', 'netto_ersparnis_eur') }} |
+          | **Monat** | {{ states('sensor.heizung_einsparung_gesamt_monat') }} |
+          {{ state_attr('sensor.heizung_einsparung_gesamt_monat', 'pellet_wert_brutto_eur') }} |
+          {{ state_attr('sensor.heizung_einsparung_gesamt_monat', 'stromkosten_eur') }} |
+          {{ state_attr('sensor.heizung_einsparung_gesamt_monat', 'netto_ersparnis_eur') }} |
+          | **Jahr** | {{ states('sensor.heizung_einsparung_gesamt_jahr') }} |
+          {{ state_attr('sensor.heizung_einsparung_gesamt_jahr', 'pellet_wert_brutto_eur') }} |
+          {{ state_attr('sensor.heizung_einsparung_gesamt_jahr', 'stromkosten_eur') }} |
+          {{ state_attr('sensor.heizung_einsparung_gesamt_jahr', 'netto_ersparnis_eur') }} |
+
+          Davon Klima (heute/Monat/Jahr): {{ states('sensor.heizung_einsparung_klima_tag') }} /
+          {{ states('sensor.heizung_einsparung_klima_monat') }} /
+          {{ states('sensor.heizung_einsparung_klima_jahr') }} kg —
+          ELWA: {{ states('sensor.heizung_einsparung_elwa_tag') }} /
+          {{ states('sensor.heizung_einsparung_elwa_monat') }} /
+          {{ states('sensor.heizung_einsparung_elwa_jahr') }} kg.
+
+          PV/Akku/Netz heute (Klima): {{ state_attr('sensor.heizung_einsparung_klima_tag', 'pv_kwh') }} /
+          {{ state_attr('sensor.heizung_einsparung_klima_tag', 'akku_kwh') }} /
+          {{ state_attr('sensor.heizung_einsparung_klima_tag', 'netz_kwh') }} kWh.
+          Klima-Wärme ist modelliert (Feld-COP-Kennlinie), ELWA-Wärme = ELWA-Strom.
+      - type: entities
+        title: Einsparung Details
+        entities:
+          - sensor.heizung_einsparung_gesamt_tag
+          - sensor.heizung_einsparung_gesamt_monat
+          - sensor.heizung_einsparung_gesamt_jahr
+          - sensor.heizung_einsparung_klima_tag
+          - sensor.heizung_einsparung_klima_monat
+          - sensor.heizung_einsparung_klima_jahr
+          - sensor.heizung_einsparung_elwa_tag
+          - sensor.heizung_einsparung_elwa_monat
+          - sensor.heizung_einsparung_elwa_jahr
+          - binary_sensor.heizung_klima_heizbetrieb
+          - sensor.heizung_stromquellen_anteil
+          - input_number.heizung_einsparung_heat_per_kg
+          - input_number.heizung_einsparung_einspeiseverguetung_ct
+          - input_number.heizung_einsparung_netzpreis_ct
+          - input_number.heizung_einsparung_feldabschlag
       - type: entities
         title: Fenster / Sperren
         entities:

@@ -1,0 +1,142 @@
+# Waechter: prueft die Wirkung, nicht die Logik.
+# Meldet Geraete, die trotz aktiver Sperre (Fenster/Nachlauf) oder trotz
+# "Alle Ventile zu" nicht ausgeschaltet sind - egal welche Ursache dahintersteckt.
+# Ausnahme: laufender Klima-Manual-Override (Timer aktiv) = Absicht des Nutzers.
+
+- binary_sensor:
+    - name: Heizung Konflikt
+      unique_id: heizung_konflikt
+      default_entity_id: binary_sensor.heizung_konflikt
+      icon: mdi:alert-octagon
+      device_class: problem
+      state: >-
+        {% set kl = is_state('input_boolean.heizung_klima_auto', 'on') %}
+        {% set td = is_state('input_boolean.heizung_tado_auto', 'on') %}
+        {% set vz = is_state('input_boolean.heizung_ventile_zu', 'on') %}
+        {% set manuell = is_state('input_select.heizung_modus', 'Manuell') %}
+        {% set paare = [
+             ('climate.wohnzimmer_2', 'binary_sensor.heizung_sperre_wohnen', 'klima', 'timer.heizung_klima_manual_wohnen'),
+             ('climate.esszimmer', 'binary_sensor.heizung_sperre_wohnen', 'klima', 'timer.heizung_klima_manual_wohnen'),
+             ('climate.faikin_mqtt_hvac', 'binary_sensor.heizung_sperre_buero', 'klima', 'timer.heizung_klima_manual_buero'),
+             ('climate.schlafen_a', 'binary_sensor.heizung_sperre_schlafen_a', 'klima', 'timer.heizung_klima_manual_schlafen_a'),
+             ('climate.schlafen_b', 'binary_sensor.heizung_sperre_schlafen_b', 'klima', 'timer.heizung_klima_manual_schlafen_b'),
+             ('climate.schlafen_c', 'binary_sensor.heizung_sperre_schlafen_c', 'klima', 'timer.heizung_klima_manual_schlafen_c'),
+             ('climate.bad', 'binary_sensor.heizung_sperre_bad', 'tado', ''),
+             ('climate.spielzimmer', 'binary_sensor.heizung_sperre_spielzimmer', 'tado', ''),
+             ('climate.schlafzimmer', 'binary_sensor.heizung_sperre_schlafen_b', 'tado', ''),
+             ('climate.schlafen_c_tado', 'binary_sensor.heizung_sperre_schlafen_c', 'tado', ''),
+             ('climate.wohnzimmer', '', 'tado', ''),
+             ('climate.buro', '', 'tado', ''),
+             ('climate.heizung_waschraum', '', 'tado', ''),
+           ] %}
+        {% set ns = namespace(l=[]) %}
+        {% if not manuell %}
+          {% for e, sp, art, tm in paare %}
+            {% set s = states(e) %}
+            {% set auto_an = kl if art == 'klima' else td %}
+            {% set gesperrt = (sp != '' and is_state(sp, 'on')) or (art == 'tado' and vz) %}
+            {% set override = tm != '' and is_state(tm, 'active') %}
+            {% if auto_an and gesperrt and not override and s not in ['unavailable', 'unknown', 'off'] %}
+              {% set ns.l = ns.l + [e] %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+        {{ ns.l | count > 0 }}
+      attributes:
+        entities: >-
+          {% set kl = is_state('input_boolean.heizung_klima_auto', 'on') %}
+          {% set td = is_state('input_boolean.heizung_tado_auto', 'on') %}
+          {% set vz = is_state('input_boolean.heizung_ventile_zu', 'on') %}
+          {% set manuell = is_state('input_select.heizung_modus', 'Manuell') %}
+          {% set paare = [
+               ('climate.wohnzimmer_2', 'binary_sensor.heizung_sperre_wohnen', 'klima', 'timer.heizung_klima_manual_wohnen'),
+               ('climate.esszimmer', 'binary_sensor.heizung_sperre_wohnen', 'klima', 'timer.heizung_klima_manual_wohnen'),
+               ('climate.faikin_mqtt_hvac', 'binary_sensor.heizung_sperre_buero', 'klima', 'timer.heizung_klima_manual_buero'),
+               ('climate.schlafen_a', 'binary_sensor.heizung_sperre_schlafen_a', 'klima', 'timer.heizung_klima_manual_schlafen_a'),
+               ('climate.schlafen_b', 'binary_sensor.heizung_sperre_schlafen_b', 'klima', 'timer.heizung_klima_manual_schlafen_b'),
+               ('climate.schlafen_c', 'binary_sensor.heizung_sperre_schlafen_c', 'klima', 'timer.heizung_klima_manual_schlafen_c'),
+               ('climate.bad', 'binary_sensor.heizung_sperre_bad', 'tado', ''),
+               ('climate.spielzimmer', 'binary_sensor.heizung_sperre_spielzimmer', 'tado', ''),
+               ('climate.schlafzimmer', 'binary_sensor.heizung_sperre_schlafen_b', 'tado', ''),
+               ('climate.schlafen_c_tado', 'binary_sensor.heizung_sperre_schlafen_c', 'tado', ''),
+               ('climate.wohnzimmer', '', 'tado', ''),
+               ('climate.buro', '', 'tado', ''),
+               ('climate.heizung_waschraum', '', 'tado', ''),
+             ] %}
+          {% set ns = namespace(l=[]) %}
+          {% if not manuell %}
+            {% for e, sp, art, tm in paare %}
+              {% set s = states(e) %}
+              {% set auto_an = kl if art == 'klima' else td %}
+              {% set gesperrt = (sp != '' and is_state(sp, 'on')) or (art == 'tado' and vz) %}
+              {% set override = tm != '' and is_state(tm, 'active') %}
+              {% if auto_an and gesperrt and not override and s not in ['unavailable', 'unknown', 'off'] %}
+                {% set ns.l = ns.l + [e] %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+          {{ ns.l }}
+        liste: >-
+          {% set kl = is_state('input_boolean.heizung_klima_auto', 'on') %}
+          {% set td = is_state('input_boolean.heizung_tado_auto', 'on') %}
+          {% set vz = is_state('input_boolean.heizung_ventile_zu', 'on') %}
+          {% set manuell = is_state('input_select.heizung_modus', 'Manuell') %}
+          {% set paare = [
+               ('climate.wohnzimmer_2', 'binary_sensor.heizung_sperre_wohnen', 'klima', 'timer.heizung_klima_manual_wohnen'),
+               ('climate.esszimmer', 'binary_sensor.heizung_sperre_wohnen', 'klima', 'timer.heizung_klima_manual_wohnen'),
+               ('climate.faikin_mqtt_hvac', 'binary_sensor.heizung_sperre_buero', 'klima', 'timer.heizung_klima_manual_buero'),
+               ('climate.schlafen_a', 'binary_sensor.heizung_sperre_schlafen_a', 'klima', 'timer.heizung_klima_manual_schlafen_a'),
+               ('climate.schlafen_b', 'binary_sensor.heizung_sperre_schlafen_b', 'klima', 'timer.heizung_klima_manual_schlafen_b'),
+               ('climate.schlafen_c', 'binary_sensor.heizung_sperre_schlafen_c', 'klima', 'timer.heizung_klima_manual_schlafen_c'),
+               ('climate.bad', 'binary_sensor.heizung_sperre_bad', 'tado', ''),
+               ('climate.spielzimmer', 'binary_sensor.heizung_sperre_spielzimmer', 'tado', ''),
+               ('climate.schlafzimmer', 'binary_sensor.heizung_sperre_schlafen_b', 'tado', ''),
+               ('climate.schlafen_c_tado', 'binary_sensor.heizung_sperre_schlafen_c', 'tado', ''),
+               ('climate.wohnzimmer', '', 'tado', ''),
+               ('climate.buro', '', 'tado', ''),
+               ('climate.heizung_waschraum', '', 'tado', ''),
+             ] %}
+          {% set ns = namespace(l=[]) %}
+          {% if not manuell %}
+            {% for e, sp, art, tm in paare %}
+              {% set s = states(e) %}
+              {% set auto_an = kl if art == 'klima' else td %}
+              {% set gesperrt = (sp != '' and is_state(sp, 'on')) or (art == 'tado' and vz) %}
+              {% set override = tm != '' and is_state(tm, 'active') %}
+              {% if auto_an and gesperrt and not override and s not in ['unavailable', 'unknown', 'off'] %}
+                {% set ns.l = ns.l + [(state_attr(e, 'friendly_name') or e) ~ ' (' ~ s ~ ')'] %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+          {{ ns.l | join(', ') if ns.l else 'keine' }}
+
+    - name: Heizung Schalter haengt
+      unique_id: heizung_schalter_haengt
+      default_entity_id: binary_sensor.heizung_schalter_haengt
+      icon: mdi:toggle-switch-off
+      device_class: problem
+      state: >-
+        {% set vz = states.input_boolean.heizung_ventile_zu %}
+        {% set kl = states.input_boolean.heizung_klima_auto %}
+        {% set td = states.input_boolean.heizung_tado_auto %}
+        {% set eta = states.input_boolean.heizung_eta_auto %}
+        {{ (vz is not none and vz.state == 'on' and (now() - vz.last_changed).total_seconds() > 10800)
+           or (kl is not none and kl.state == 'off' and (now() - kl.last_changed).total_seconds() > 43200)
+           or (td is not none and td.state == 'off' and (now() - td.last_changed).total_seconds() > 43200)
+           or (eta is not none and eta.state == 'off' and (now() - eta.last_changed).total_seconds() > 43200) }}
+      attributes:
+        liste: >-
+          {% set ns = namespace(l=[]) %}
+          {% set vz = states.input_boolean.heizung_ventile_zu %}
+          {% if vz is not none and vz.state == 'on' and (now() - vz.last_changed).total_seconds() > 10800 %}
+            {% set ns.l = ns.l + ['Alle Ventile zu seit ' ~ ((now() - vz.last_changed).total_seconds() / 3600) | round(1) ~ ' h'] %}
+          {% endif %}
+          {% for eid, label in [('input_boolean.heizung_klima_auto', 'Klima-Automatik'),
+                                ('input_boolean.heizung_tado_auto', 'tado-Automatik'),
+                                ('input_boolean.heizung_eta_auto', 'ETA-Automatik')] %}
+            {% set s = states[eid] %}
+            {% if s is not none and s.state == 'off' and (now() - s.last_changed).total_seconds() > 43200 %}
+              {% set ns.l = ns.l + [label ~ ' aus seit ' ~ ((now() - s.last_changed).total_seconds() / 3600) | round(1) ~ ' h'] %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.l | join(', ') if ns.l else 'keine' }}

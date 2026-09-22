@@ -9,3 +9,7 @@ secrets.yaml
 *.key
 .idea/
 .vscode/
+
+# HA Lovelace storage dumps (local UI exports)
+*.storage.json
+*.storage-backup.json

@@ -174,6 +174,16 @@ template:
           {% elif modus == 'Away' %}true
           {% else %}{{ not is_state('person.person_a', 'home') }}
           {% endif %}
+      - name: Heizung Away Spielzimmer aktiv
+        unique_id: heizung_away_spielzimmer_aktiv
+        default_entity_id: binary_sensor.heizung_away_spielzimmer_aktiv
+        icon: mdi:teddy-bear
+        state: >-
+          {% set modus = states('input_select.heizung_away_spielzimmer') %}
+          {% if modus == 'Home' %}false
+          {% elif modus == 'Away' %}true
+          {% else %}{{ not is_state('person.person_c', 'home') }}
+          {% endif %}
 
       - name: Heizung Klima wenig Wohnen
         unique_id: bs_heizung_klima_wenig_wohnen
@@ -337,7 +347,7 @@ template:
             {% set b = states('input_datetime.heizung_spiel_wt_ende') %}
           {% endif %}
           {% set plan = states('input_number.heizung_spiel_c') | float if (n >= a and n < b) else 'off' %}
-          {% if plan != 'off' and is_state('binary_sensor.heizung_away_aktiv', 'on') %}{{ states('input_number.heizung_away_c') | float(18) }}
+          {% if plan != 'off' and is_state('binary_sensor.heizung_away_spielzimmer_aktiv', 'on') %}{{ states('input_number.heizung_away_c') | float(18) }}
           {% else %}{{ plan }}{% endif %}
       - name: Heizung Status
         unique_id: heizung_status
@@ -362,6 +372,7 @@ template:
           dwd_nachttiefst: "{{ states('sensor.heizung_dwd_nachttiefst') }}"
           away: "{{ states('binary_sensor.heizung_away_aktiv') }}"
           away_buero: "{{ states('binary_sensor.heizung_away_buero_aktiv') }}"
+          away_spielzimmer: "{{ states('binary_sensor.heizung_away_spielzimmer_aktiv') }}"
           schimmel_buero: "{{ states('binary_sensor.schimmel_heizen_aktiv_buero') }}"
           schimmel_wohnen: "{{ states('binary_sensor.schimmel_heizen_aktiv_wohnen') }}"
           schimmel_schlafzimmer: "{{ states('binary_sensor.schimmel_heizen_aktiv_schlafzimmer') }}"
@@ -517,7 +528,7 @@ template:
           {% set cp = 1.163 %}
           {% set dt_h = 0.5 %}
           {% set ww_tag = states('input_number.heizung_ww_liter_tag') | float(80) * cp * (tmin - 10.0) / 1000.0 %}
-          {% set hk_kw = states('input_number.heizung_heizkreis_kw') | float(2) %}
+          {% set hk_mess = states('sensor.heizung_heizkreis_kw_ist') | float(0) %}{% set hk_kw = hk_mess if hk_mess > 0.2 else states('input_number.heizung_heizkreis_kw') | float(2) %}{% set vl_mess = states('sensor.heizung_puffer_verlust_kw') | float(0) %}{% set verlust_kw = vl_mess if vl_mess > 0.02 else 0.08 %}
           {% set haus_kw = [[states('sensor.e3dc_berechneter_hausverbrauch_wallbox_elwa') | float(1000) / 1000.0, 0.5] | max, 2.5] | min %}
           {% set ventile_zu = is_state('input_boolean.heizung_ventile_zu', 'on') %}
           {% set heiz_aus = states('input_select.heizung_modus') in ['Aus', 'Manuell'] %}
@@ -563,11 +574,11 @@ template:
             {% set bat_kw = (ns.socn - ns.soc) / 100.0 * 15.0 / dt_h %}
             {% set surplus = [ns.pv - haus_kw - ([bat_kw, 0] | max), 0] | max %}
             {% set cap = m * cp %}
-            {% set q = (ww_kw + hyd_kw + 0.08) * dt_h * 1000.0 %}
+            {% set q = (ww_kw + hyd_kw + verlust_kw) * dt_h * 1000.0 %}
             {% set d1 = [q / cap, ns.t1 - 20] | min %}{% set ns.t1 = ns.t1 - d1 %}{% set q = q - d1 * cap %}
             {% set d2 = [q / cap, ns.t2 - 20] | min %}{% set ns.t2 = ns.t2 - d2 %}{% set q = q - d2 * cap %}
             {% set d3 = [q / cap, ns.t3 - 20] | min %}{% set ns.t3 = ns.t3 - d3 %}
-            {% set qe = (ww_kw + hyd_kw + 0.08) * dt_h * 1000.0 %}
+            {% set qe = (ww_kw + hyd_kw + verlust_kw) * dt_h * 1000.0 %}
             {% set de1 = [qe / cap, ns.e1 - 20] | min %}{% set ns.e1 = ns.e1 - de1 %}{% set qe = qe - de1 * cap %}
             {% set de2 = [qe / cap, ns.e2 - 20] | min %}{% set ns.e2 = ns.e2 - de2 %}{% set qe = qe - de2 * cap %}
             {% set de3 = [qe / cap, ns.e3 - 20] | min %}{% set ns.e3 = ns.e3 - de3 %}
@@ -591,7 +602,7 @@ template:
             {% set cp = 1.163 %}
             {% set dt_h = 0.5 %}
             {% set ww_tag = states('input_number.heizung_ww_liter_tag') | float(80) * cp * (tmin - 10.0) / 1000.0 %}
-            {% set hk_kw = states('input_number.heizung_heizkreis_kw') | float(2) %}
+            {% set hk_mess = states('sensor.heizung_heizkreis_kw_ist') | float(0) %}{% set hk_kw = hk_mess if hk_mess > 0.2 else states('input_number.heizung_heizkreis_kw') | float(2) %}{% set vl_mess = states('sensor.heizung_puffer_verlust_kw') | float(0) %}{% set verlust_kw = vl_mess if vl_mess > 0.02 else 0.08 %}
             {% set haus_kw = [[states('sensor.e3dc_berechneter_hausverbrauch_wallbox_elwa') | float(1000) / 1000.0, 0.5] | max, 2.5] | min %}
             {% set ventile_zu = is_state('input_boolean.heizung_ventile_zu', 'on') %}
             {% set heiz_aus = states('input_select.heizung_modus') in ['Aus', 'Manuell'] %}
@@ -639,11 +650,11 @@ template:
               {% set surplus = [ns.pv - haus_kw - ([bat_kw, 0] | max), 0] | max %}
               {% if surplus > 0.4 and ns.surplus_i is none %}{% set ns.surplus_i = i %}{% endif %}
               {% set cap = m * cp %}
-              {% set q = (ww_kw + hyd_kw + 0.08) * dt_h * 1000.0 %}
+              {% set q = (ww_kw + hyd_kw + verlust_kw) * dt_h * 1000.0 %}
               {% set d1 = [q / cap, ns.t1 - 20] | min %}{% set ns.t1 = ns.t1 - d1 %}{% set q = q - d1 * cap %}
               {% set d2 = [q / cap, ns.t2 - 20] | min %}{% set ns.t2 = ns.t2 - d2 %}{% set q = q - d2 * cap %}
               {% set d3 = [q / cap, ns.t3 - 20] | min %}{% set ns.t3 = ns.t3 - d3 %}
-              {% set qe = (ww_kw + hyd_kw + 0.08) * dt_h * 1000.0 %}
+              {% set qe = (ww_kw + hyd_kw + verlust_kw) * dt_h * 1000.0 %}
               {% set de1 = [qe / cap, ns.e1 - 20] | min %}{% set ns.e1 = ns.e1 - de1 %}{% set qe = qe - de1 * cap %}
               {% set de2 = [qe / cap, ns.e2 - 20] | min %}{% set ns.e2 = ns.e2 - de2 %}{% set qe = qe - de2 * cap %}
               {% set de3 = [qe / cap, ns.e3 - 20] | min %}{% set ns.e3 = ns.e3 - de3 %}
@@ -678,7 +689,7 @@ template:
             {% set cp = 1.163 %}
             {% set dt_h = 0.5 %}
             {% set ww_tag = states('input_number.heizung_ww_liter_tag') | float(80) * cp * (tmin - 10.0) / 1000.0 %}
-            {% set hk_kw = states('input_number.heizung_heizkreis_kw') | float(2) %}
+            {% set hk_mess = states('sensor.heizung_heizkreis_kw_ist') | float(0) %}{% set hk_kw = hk_mess if hk_mess > 0.2 else states('input_number.heizung_heizkreis_kw') | float(2) %}{% set vl_mess = states('sensor.heizung_puffer_verlust_kw') | float(0) %}{% set verlust_kw = vl_mess if vl_mess > 0.02 else 0.08 %}
             {% set haus_kw = [[states('sensor.e3dc_berechneter_hausverbrauch_wallbox_elwa') | float(1000) / 1000.0, 0.5] | max, 2.5] | min %}
             {% set ventile_zu = is_state('input_boolean.heizung_ventile_zu', 'on') %}
             {% set heiz_aus = states('input_select.heizung_modus') in ['Aus', 'Manuell'] %}
@@ -724,11 +735,11 @@ template:
               {% set bat_kw = (ns.socn - ns.soc) / 100.0 * 15.0 / dt_h %}
               {% set surplus = [ns.pv - haus_kw - ([bat_kw, 0] | max), 0] | max %}
               {% set cap = m * cp %}
-              {% set q = (ww_kw + hyd_kw + 0.08) * dt_h * 1000.0 %}
+              {% set q = (ww_kw + hyd_kw + verlust_kw) * dt_h * 1000.0 %}
               {% set d1 = [q / cap, ns.t1 - 20] | min %}{% set ns.t1 = ns.t1 - d1 %}{% set q = q - d1 * cap %}
               {% set d2 = [q / cap, ns.t2 - 20] | min %}{% set ns.t2 = ns.t2 - d2 %}{% set q = q - d2 * cap %}
               {% set d3 = [q / cap, ns.t3 - 20] | min %}{% set ns.t3 = ns.t3 - d3 %}
-              {% set qe = (ww_kw + hyd_kw + 0.08) * dt_h * 1000.0 %}
+              {% set qe = (ww_kw + hyd_kw + verlust_kw) * dt_h * 1000.0 %}
               {% set de1 = [qe / cap, ns.e1 - 20] | min %}{% set ns.e1 = ns.e1 - de1 %}{% set qe = qe - de1 * cap %}
               {% set de2 = [qe / cap, ns.e2 - 20] | min %}{% set ns.e2 = ns.e2 - de2 %}{% set qe = qe - de2 * cap %}
               {% set de3 = [qe / cap, ns.e3 - 20] | min %}{% set ns.e3 = ns.e3 - de3 %}
@@ -747,3 +758,27 @@ template:
               {% set ns.soc = ns.socn %}
             {% endfor %}
             {{ {'ts': ns.ts, 'top_ohne': ns.top_ohne, 'top_mit': ns.top_mit, 'pv_kw': ns.pvs, 'surplus_kw': ns.sur, 'soc': ns.socs} | tojson }}
+
+  # Dashboard helper: selects the matching original ETA FWM icon.
+  - sensor:
+      - name: Heizung FWM Status
+        unique_id: heizung_fwm_status
+        default_entity_id: sensor.heizung_fwm_status
+        icon: mdi:heat-wave
+        state: >-
+          {% set zirk = states('sensor.wasser_ausgange_zirkulation') %}
+          {% set pumpe = states('sensor.wasser_ausgange_pufferpumpe') | float(0) %}
+          {% set durchfluss = states('sensor.wasser_eingange_durchflusssensor') | float(0) %}
+          {% if zirk in ['Ein', 'on', 'On'] %}
+            zirkulation
+          {% elif pumpe > 0 or durchfluss > 1 %}
+            brauchwasser
+          {% else %}
+            bereit
+          {% endif %}
+        attributes:
+          warmwasser: "{{ states('sensor.wasser_warmwasser_warmwasser') }}"
+          primaer_vorlauf: "{{ states('sensor.wasser_warmwasser_primar_vorlauf') }}"
+          primaer_ruecklauf: "{{ states('sensor.wasser_warmwasser_primar_rucklauf') }}"
+          pufferpumpe: "{{ states('sensor.wasser_ausgange_pufferpumpe') }}"
+          durchfluss_hz: "{{ states('sensor.wasser_eingange_durchflusssensor') }}"

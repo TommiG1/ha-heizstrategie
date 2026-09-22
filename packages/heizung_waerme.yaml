@@ -1,0 +1,176 @@
+# Waermebilanz aus der Puffer-Energiebilanz.
+# Misst in ruhigen Fenstern (Kessel aus, ELWA aus, keine WW-Zapfung) die
+# tatsaechliche Heizkreisleistung und den Standby-Verlust des Puffers.
+# Ersetzt die feste 2-kW-Annahme in sensor.heizung_puffer_prognose.
+
+- sensor:
+    - name: Heizung Puffer Inhalt
+      unique_id: heizung_puffer_inhalt_kwh
+      default_entity_id: sensor.heizung_puffer_inhalt_kwh
+      unit_of_measurement: kWh
+      state_class: measurement
+      icon: mdi:database
+      availability: >-
+        {{ is_number(states('sensor.pufferflex_eingange_fuhler_1_oben'))
+           and is_number(states('sensor.pufferflex_eingange_fuhler_2'))
+           and is_number(states('sensor.pufferflex_eingange_fuhler_3')) }}
+      state: >-
+        {% set m = 825.0 / 3.0 %}
+        {% set cp = 1.163 %}
+        {% set tref = 10.0 %}
+        {% set t1 = states('sensor.pufferflex_eingange_fuhler_1_oben') | float(0) %}
+        {% set t2 = states('sensor.pufferflex_eingange_fuhler_2') | float(0) %}
+        {% set t3 = states('sensor.pufferflex_eingange_fuhler_3') | float(0) %}
+        {{ (((t1 - tref) + (t2 - tref) + (t3 - tref)) * m * cp / 1000) | round(3) }}
+      attributes:
+        oben: "{{ states('sensor.pufferflex_eingange_fuhler_1_oben') }}"
+        mitte: "{{ states('sensor.pufferflex_eingange_fuhler_2') }}"
+        unten: "{{ states('sensor.pufferflex_eingange_fuhler_3') }}"
+
+- trigger:
+    - trigger: time_pattern
+      minutes: "/30"
+  sensor:
+    - name: Heizung Puffer Entnahme
+      unique_id: heizung_puffer_entnahme_kw
+      default_entity_id: sensor.heizung_puffer_entnahme_kw
+      unit_of_measurement: kW
+      state_class: measurement
+      icon: mdi:transmission-tower-export
+      state: >-
+        {% set e = states('sensor.heizung_puffer_inhalt_kwh') | float(0) %}
+        {% set ep = this.attributes.get('e_prev') | float(-999) %}
+        {% set tp = this.attributes.get('ts_prev') | float(0) %}
+        {% set dt = (now().timestamp() - tp) / 3600 %}
+        {% if tp > 0 and ep > -900 and dt > 0.4 and dt < 0.7 %}
+          {{ ((ep - e) / dt) | round(3) }}
+        {% else %}{{ this.state | float(0) | round(3) }}{% endif %}
+      attributes:
+        e_prev: "{{ states('sensor.heizung_puffer_inhalt_kwh') | float(0) }}"
+        ts_prev: "{{ now().timestamp() | int }}"
+        gueltig: >-
+          {% set ep = this.attributes.get('e_prev') | float(-999) %}
+          {% set tp = this.attributes.get('ts_prev') | float(0) %}
+          {% set dt = (now().timestamp() - tp) / 3600 %}
+          {{ tp > 0 and ep > -900 and dt > 0.4 and dt < 0.7 }}
+        stabil: >-
+          {% set win = 1740 %}
+          {{ is_state('switch.kessel_sonstiges_ein_aus_taste', 'off')
+             and (now() - states.switch.kessel_sonstiges_ein_aus_taste.last_changed).total_seconds() >= win
+             and is_state('binary_sensor.heizung_elwa_aktiv', 'off')
+             and (now() - states.binary_sensor.heizung_elwa_aktiv.last_changed).total_seconds() >= win
+             and is_state('sensor.heizung_fwm_status', 'bereit')
+             and (now() - states.sensor.heizung_fwm_status.last_changed).total_seconds() >= win }}
+        pumpe: >-
+          {% set win = 1740 %}
+          {% if (now() - states.binary_sensor.heizung_hk_pumpe_aktiv.last_changed).total_seconds() < win %}wechsel
+          {% elif is_state('binary_sensor.heizung_hk_pumpe_aktiv', 'on') %}an
+          {% else %}aus{% endif %}
+
+    - name: Heizung Puffer Verlust
+      unique_id: heizung_puffer_verlust_kw
+      default_entity_id: sensor.heizung_puffer_verlust_kw
+      unit_of_measurement: kW
+      state_class: measurement
+      icon: mdi:thermometer-minus
+      state: >-
+        {% set win = 1740 %}
+        {% set alt = this.state | float(0.08) %}
+        {% set e = states('sensor.heizung_puffer_inhalt_kwh') | float(0) %}
+        {% set ep = this.attributes.get('e_prev') | float(-999) %}
+        {% set tp = this.attributes.get('ts_prev') | float(0) %}
+        {% set dt = (now().timestamp() - tp) / 3600 %}
+        {% set ok = tp > 0 and ep > -900 and dt > 0.4 and dt < 0.7 %}
+        {% set kw = ((ep - e) / dt) if ok else -99 %}
+        {% set stabil = is_state('switch.kessel_sonstiges_ein_aus_taste', 'off')
+           and (now() - states.switch.kessel_sonstiges_ein_aus_taste.last_changed).total_seconds() >= win
+           and is_state('binary_sensor.heizung_elwa_aktiv', 'off')
+           and (now() - states.binary_sensor.heizung_elwa_aktiv.last_changed).total_seconds() >= win
+           and is_state('sensor.heizung_fwm_status', 'bereit')
+           and (now() - states.sensor.heizung_fwm_status.last_changed).total_seconds() >= win %}
+        {% set pumpe_aus = is_state('binary_sensor.heizung_hk_pumpe_aktiv', 'off')
+           and (now() - states.binary_sensor.heizung_hk_pumpe_aktiv.last_changed).total_seconds() >= win %}
+        {% if ok and stabil and pumpe_aus and kw >= 0.0 and kw <= 1.0 %}
+          {{ (alt * 0.85 + kw * 0.15) | round(3) }}
+        {% else %}{{ alt | round(3) }}{% endif %}
+      attributes:
+        e_prev: "{{ states('sensor.heizung_puffer_inhalt_kwh') | float(0) }}"
+        ts_prev: "{{ now().timestamp() | int }}"
+        proben: >-
+          {% set win = 1740 %}
+          {% set n = this.attributes.get('proben') | int(0) %}
+          {% set e = states('sensor.heizung_puffer_inhalt_kwh') | float(0) %}
+          {% set ep = this.attributes.get('e_prev') | float(-999) %}
+          {% set tp = this.attributes.get('ts_prev') | float(0) %}
+          {% set dt = (now().timestamp() - tp) / 3600 %}
+          {% set ok = tp > 0 and ep > -900 and dt > 0.4 and dt < 0.7 %}
+          {% set kw = ((ep - e) / dt) if ok else -99 %}
+          {% set stabil = is_state('switch.kessel_sonstiges_ein_aus_taste', 'off')
+             and is_state('binary_sensor.heizung_elwa_aktiv', 'off')
+             and is_state('sensor.heizung_fwm_status', 'bereit') %}
+          {% set pumpe_aus = is_state('binary_sensor.heizung_hk_pumpe_aktiv', 'off')
+             and (now() - states.binary_sensor.heizung_hk_pumpe_aktiv.last_changed).total_seconds() >= win %}
+          {{ n + 1 if (ok and stabil and pumpe_aus and kw >= 0.0 and kw <= 1.0) else n }}
+
+    - name: Heizung Heizkreis Leistung Ist
+      unique_id: heizung_heizkreis_kw_ist
+      default_entity_id: sensor.heizung_heizkreis_kw_ist
+      unit_of_measurement: kW
+      state_class: measurement
+      icon: mdi:radiator
+      state: >-
+        {% set win = 1740 %}
+        {% set alt = this.state | float(0) %}
+        {% set verlust = states('sensor.heizung_puffer_verlust_kw') | float(0.08) %}
+        {% set e = states('sensor.heizung_puffer_inhalt_kwh') | float(0) %}
+        {% set ep = this.attributes.get('e_prev') | float(-999) %}
+        {% set tp = this.attributes.get('ts_prev') | float(0) %}
+        {% set dt = (now().timestamp() - tp) / 3600 %}
+        {% set ok = tp > 0 and ep > -900 and dt > 0.4 and dt < 0.7 %}
+        {% set netto = (((ep - e) / dt) - verlust) if ok else -99 %}
+        {% set stabil = is_state('switch.kessel_sonstiges_ein_aus_taste', 'off')
+           and (now() - states.switch.kessel_sonstiges_ein_aus_taste.last_changed).total_seconds() >= win
+           and is_state('binary_sensor.heizung_elwa_aktiv', 'off')
+           and (now() - states.binary_sensor.heizung_elwa_aktiv.last_changed).total_seconds() >= win
+           and is_state('sensor.heizung_fwm_status', 'bereit')
+           and (now() - states.sensor.heizung_fwm_status.last_changed).total_seconds() >= win %}
+        {% set pumpe_an = is_state('binary_sensor.heizung_hk_pumpe_aktiv', 'on')
+           and (now() - states.binary_sensor.heizung_hk_pumpe_aktiv.last_changed).total_seconds() >= win %}
+        {% if ok and stabil and pumpe_an and netto > 0.1 and netto < 10.0 %}
+          {{ (netto if alt <= 0 else (alt * 0.75 + netto * 0.25)) | round(2) }}
+        {% else %}{{ alt | round(2) }}{% endif %}
+      attributes:
+        e_prev: "{{ states('sensor.heizung_puffer_inhalt_kwh') | float(0) }}"
+        ts_prev: "{{ now().timestamp() | int }}"
+        proben: >-
+          {% set win = 1740 %}
+          {% set n = this.attributes.get('proben') | int(0) %}
+          {% set verlust = states('sensor.heizung_puffer_verlust_kw') | float(0.08) %}
+          {% set e = states('sensor.heizung_puffer_inhalt_kwh') | float(0) %}
+          {% set ep = this.attributes.get('e_prev') | float(-999) %}
+          {% set tp = this.attributes.get('ts_prev') | float(0) %}
+          {% set dt = (now().timestamp() - tp) / 3600 %}
+          {% set ok = tp > 0 and ep > -900 and dt > 0.4 and dt < 0.7 %}
+          {% set netto = (((ep - e) / dt) - verlust) if ok else -99 %}
+          {% set stabil = is_state('switch.kessel_sonstiges_ein_aus_taste', 'off')
+             and is_state('binary_sensor.heizung_elwa_aktiv', 'off')
+             and is_state('sensor.heizung_fwm_status', 'bereit') %}
+          {% set pumpe_an = is_state('binary_sensor.heizung_hk_pumpe_aktiv', 'on')
+             and (now() - states.binary_sensor.heizung_hk_pumpe_aktiv.last_changed).total_seconds() >= win %}
+          {{ n + 1 if (ok and stabil and pumpe_an and netto > 0.1 and netto < 10.0) else n }}
+        letzte_messung: >-
+          {% set win = 1740 %}
+          {% set verlust = states('sensor.heizung_puffer_verlust_kw') | float(0.08) %}
+          {% set e = states('sensor.heizung_puffer_inhalt_kwh') | float(0) %}
+          {% set ep = this.attributes.get('e_prev') | float(-999) %}
+          {% set tp = this.attributes.get('ts_prev') | float(0) %}
+          {% set dt = (now().timestamp() - tp) / 3600 %}
+          {% set ok = tp > 0 and ep > -900 and dt > 0.4 and dt < 0.7 %}
+          {% set netto = (((ep - e) / dt) - verlust) if ok else -99 %}
+          {% set stabil = is_state('switch.kessel_sonstiges_ein_aus_taste', 'off')
+             and is_state('binary_sensor.heizung_elwa_aktiv', 'off')
+             and is_state('sensor.heizung_fwm_status', 'bereit') %}
+          {% set pumpe_an = is_state('binary_sensor.heizung_hk_pumpe_aktiv', 'on')
+             and (now() - states.binary_sensor.heizung_hk_pumpe_aktiv.last_changed).total_seconds() >= win %}
+          {% if ok and stabil and pumpe_an and netto > 0.1 and netto < 10.0 %}{{ now().strftime('%d.%m. %H:%M') }} / {{ netto | round(2) }} kW
+          {% else %}{{ this.attributes.get('letzte_messung', 'noch keine') }}{% endif %}

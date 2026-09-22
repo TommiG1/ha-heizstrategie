@@ -1,7 +1,8 @@
 # Mold templates (package)
 # 1) Local risk sensors (temp/humidity → margin like tado)
-# 2) Mold-heat binary sensors (boost climate when outdoor air is not drier)
-# 3) Ventilation advice aggregating room risks vs outdoor dew point
+# 2) Outdoor: see packages/aussen_wetter.yaml (ETA→Netatmo→DWD + Abgleich)
+# 3) Mold-heat binary sensors (boost climate when outdoor air is not drier)
+# 4) Ventilation advice aggregating room risks vs outdoor dew point
 # See ENTITY_MAP.md for room climate/humidity and tado risk entities.
 
 template:
@@ -51,6 +52,90 @@ template:
               {{ (t - dp) | round(1) }}
             {% endif %}
 
+      - name: Schimmelpilzrisiko Büro
+        unique_id: schimmel_risiko_buero_netatmo
+        default_entity_id: sensor.schimmel_risiko_buero
+        icon: mdi:mushroom
+        availability: >-
+          {{ states('sensor.netatmo_buero_temperatur') not in ['unknown', 'unavailable', '']
+             and states('sensor.netatmo_buero_luftfeuchtigkeit') not in ['unknown', 'unavailable', ''] }}
+        state: >-
+          {% set t = states('sensor.netatmo_buero_temperatur') | float(none) %}
+          {% set rh = states('sensor.netatmo_buero_luftfeuchtigkeit') | float(none) %}
+          {% if t is none or rh is none or rh <= 0 %}
+            unavailable
+          {% else %}
+            {% set gamma = (rh / 100) | log + (17.62 * t) / (243.12 + t) %}
+            {% set dp = (243.12 * gamma) / (17.62 - gamma) %}
+            {% set margin = t - dp %}
+            {% if margin < 3 %}Critical{% elif margin < 5 %}High{% elif margin < 7 %}Medium{% else %}Low{% endif %}
+          {% endif %}
+        attributes:
+          source: netatmo
+          room_temperature: "{{ states('sensor.netatmo_buero_temperatur') | float(none) }}"
+          humidity: "{{ states('sensor.netatmo_buero_luftfeuchtigkeit') | float(none) }}"
+          dew_point: >-
+            {% set t = states('sensor.netatmo_buero_temperatur') | float(none) %}
+            {% set rh = states('sensor.netatmo_buero_luftfeuchtigkeit') | float(none) %}
+            {% if t is none or rh is none or rh <= 0 %}
+              None
+            {% else %}
+              {% set gamma = (rh / 100) | log + (17.62 * t) / (243.12 + t) %}
+              {{ ((243.12 * gamma) / (17.62 - gamma)) | round(1) }}
+            {% endif %}
+          margin: >-
+            {% set t = states('sensor.netatmo_buero_temperatur') | float(none) %}
+            {% set rh = states('sensor.netatmo_buero_luftfeuchtigkeit') | float(none) %}
+            {% if t is none or rh is none or rh <= 0 %}
+              None
+            {% else %}
+              {% set gamma = (rh / 100) | log + (17.62 * t) / (243.12 + t) %}
+              {% set dp = (243.12 * gamma) / (17.62 - gamma) %}
+              {{ (t - dp) | round(1) }}
+            {% endif %}
+
+      - name: Schimmelpilzrisiko Bad
+        unique_id: schimmel_risiko_bad_netatmo
+        default_entity_id: sensor.schimmel_risiko_bad
+        icon: mdi:mushroom
+        availability: >-
+          {{ states('sensor.netatmo_bad_temperatur') not in ['unknown', 'unavailable', '']
+             and states('sensor.netatmo_bad_luftfeuchtigkeit') not in ['unknown', 'unavailable', ''] }}
+        state: >-
+          {% set t = states('sensor.netatmo_bad_temperatur') | float(none) %}
+          {% set rh = states('sensor.netatmo_bad_luftfeuchtigkeit') | float(none) %}
+          {% if t is none or rh is none or rh <= 0 %}
+            unavailable
+          {% else %}
+            {% set gamma = (rh / 100) | log + (17.62 * t) / (243.12 + t) %}
+            {% set dp = (243.12 * gamma) / (17.62 - gamma) %}
+            {% set margin = t - dp %}
+            {% if margin < 3 %}Critical{% elif margin < 5 %}High{% elif margin < 7 %}Medium{% else %}Low{% endif %}
+          {% endif %}
+        attributes:
+          source: netatmo
+          room_temperature: "{{ states('sensor.netatmo_bad_temperatur') | float(none) }}"
+          humidity: "{{ states('sensor.netatmo_bad_luftfeuchtigkeit') | float(none) }}"
+          dew_point: >-
+            {% set t = states('sensor.netatmo_bad_temperatur') | float(none) %}
+            {% set rh = states('sensor.netatmo_bad_luftfeuchtigkeit') | float(none) %}
+            {% if t is none or rh is none or rh <= 0 %}
+              None
+            {% else %}
+              {% set gamma = (rh / 100) | log + (17.62 * t) / (243.12 + t) %}
+              {{ ((243.12 * gamma) / (17.62 - gamma)) | round(1) }}
+            {% endif %}
+          margin: >-
+            {% set t = states('sensor.netatmo_bad_temperatur') | float(none) %}
+            {% set rh = states('sensor.netatmo_bad_luftfeuchtigkeit') | float(none) %}
+            {% if t is none or rh is none or rh <= 0 %}
+              None
+            {% else %}
+              {% set gamma = (rh / 100) | log + (17.62 * t) / (243.12 + t) %}
+              {% set dp = (243.12 * gamma) / (17.62 - gamma) %}
+              {{ (t - dp) | round(1) }}
+            {% endif %}
+
       - name: Schimmelpilzrisiko Schlafen C
         unique_id: schimmel_risiko_schlafen_c_local
         default_entity_id: sensor.schimmel_risiko_schlafen_c
@@ -92,6 +177,48 @@ template:
               {% set dp = (243.12 * gamma) / (17.62 - gamma) %}
               {{ (t - dp) | round(1) }}
             {% endif %}
+
+      - name: Schimmelpilzrisiko Schlafzimmer
+        unique_id: schimmel_risiko_schlafzimmer_aqara
+        default_entity_id: sensor.schimmel_risiko_schlafzimmer
+        icon: mdi:mushroom
+        availability: >-
+          {{ states('sensor.aqara_temp_schlafen_b_temperature') not in ['unknown', 'unavailable', '']
+             and states('sensor.aqara_temp_schlafen_b_humidity') not in ['unknown', 'unavailable', ''] }}
+        state: >-
+          {% set t = states('sensor.aqara_temp_schlafen_b_temperature') | float(none) %}
+          {% set rh = states('sensor.aqara_temp_schlafen_b_humidity') | float(none) %}
+          {% if t is none or rh is none or rh <= 0 %}
+            unavailable
+          {% else %}
+            {% set gamma = (rh / 100) | log + (17.62 * t) / (243.12 + t) %}
+            {% set dp = (243.12 * gamma) / (17.62 - gamma) %}
+            {% set margin = t - dp %}
+            {% if margin < 3 %}Critical{% elif margin < 5 %}High{% elif margin < 7 %}Medium{% else %}Low{% endif %}
+          {% endif %}
+        attributes:
+          source: aqara
+          room_temperature: "{{ states('sensor.aqara_temp_schlafen_b_temperature') | float(none) }}"
+          humidity: "{{ states('sensor.aqara_temp_schlafen_b_humidity') | float(none) }}"
+          dew_point: >-
+            {% set t = states('sensor.aqara_temp_schlafen_b_temperature') | float(none) %}
+            {% set rh = states('sensor.aqara_temp_schlafen_b_humidity') | float(none) %}
+            {% if t is none or rh is none or rh <= 0 %}
+              None
+            {% else %}
+              {% set gamma = (rh / 100) | log + (17.62 * t) / (243.12 + t) %}
+              {{ ((243.12 * gamma) / (17.62 - gamma)) | round(1) }}
+            {% endif %}
+          margin: >-
+            {% set t = states('sensor.aqara_temp_schlafen_b_temperature') | float(none) %}
+            {% set rh = states('sensor.aqara_temp_schlafen_b_humidity') | float(none) %}
+            {% if t is none or rh is none or rh <= 0 %}
+              None
+            {% else %}
+              {% set gamma = (rh / 100) | log + (17.62 * t) / (243.12 + t) %}
+              {% set dp = (243.12 * gamma) / (17.62 - gamma) %}
+              {{ (t - dp) | round(1) }}
+            {% endif %}
   - binary_sensor:
       # Schimmel-Heizen: nur 11–18 Uhr, nur wenn Schalter an,
       # Risiko Medium/High und Außenluft nicht trockener (→ Heizen statt Lüften).
@@ -110,8 +237,8 @@ template:
         default_entity_id: binary_sensor.schimmel_heizen_aktiv_buero
         icon: mdi:radiator
         state: >-
-          {% set eid = 'sensor.buro_buro_schimmelpilzrisiko' %}
-          {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+          {% set eid = 'sensor.schimmel_risiko_buero' %}
+          {% set out_dp = states('sensor.aussen_taupunkt') | float(none) %}
           {% set in_dp = state_attr(eid, 'dew_point') | float(none) %}
           {{ is_state('input_boolean.schimmel_heizen_buero', 'on')
              and is_state('binary_sensor.schimmel_heizen_fenster', 'on')
@@ -126,7 +253,7 @@ template:
         icon: mdi:radiator
         state: >-
           {% set eid = 'sensor.schimmel_risiko_wohnen' %}
-          {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+          {% set out_dp = states('sensor.aussen_taupunkt') | float(none) %}
           {% set in_dp = state_attr(eid, 'dew_point') | float(none) %}
           {{ is_state('input_boolean.schimmel_heizen_wohnen', 'on')
              and is_state('binary_sensor.schimmel_heizen_fenster', 'on')
@@ -140,8 +267,8 @@ template:
         default_entity_id: binary_sensor.schimmel_heizen_aktiv_schlafzimmer
         icon: mdi:radiator
         state: >-
-          {% set eid = 'sensor.schlafzimmer_schlafzimmer_schimmelpilzrisiko' %}
-          {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+          {% set eid = 'sensor.schimmel_risiko_schlafzimmer' %}
+          {% set out_dp = states('sensor.aussen_taupunkt') | float(none) %}
           {% set in_dp = state_attr(eid, 'dew_point') | float(none) %}
           {{ is_state('input_boolean.schimmel_heizen_schlafzimmer', 'on')
              and is_state('binary_sensor.schimmel_heizen_fenster', 'on')
@@ -156,7 +283,7 @@ template:
         icon: mdi:radiator
         state: >-
           {% set eid = 'sensor.schimmel_risiko_schlafen_c' %}
-          {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+          {% set out_dp = states('sensor.aussen_taupunkt') | float(none) %}
           {% set in_dp = state_attr(eid, 'dew_point') | float(none) %}
           {{ is_state('input_boolean.schimmel_heizen_schlafen_c', 'on')
              and is_state('binary_sensor.schimmel_heizen_fenster', 'on')
@@ -170,15 +297,15 @@ template:
         icon: mdi:weather-windy
         state: >
           {% set rooms = [
-            ('Büro', 'sensor.buro_buro_schimmelpilzrisiko'),
+            ('Büro', 'sensor.schimmel_risiko_buero'),
             ('Wohnzimmer', 'sensor.schimmel_risiko_wohnen'),
             ('Schlafen C', 'sensor.schimmel_risiko_schlafen_c'),
-            ('Schlafzimmer', 'sensor.schlafzimmer_schlafzimmer_schimmelpilzrisiko'),
-            ('Bad', 'sensor.bad_bad_schimmelpilzrisiko'),
+            ('Schlafzimmer', 'sensor.schimmel_risiko_schlafzimmer'),
+            ('Bad', 'sensor.schimmel_risiko_bad'),
             ('Spielzimmer', 'sensor.spielzimmer_spielzimmer_schimmelpilzrisiko'),
           ] %}
-          {% set out_t = state_attr('weather.home', 'temperature') | float(none) %}
-          {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+          {% set out_t = states('sensor.aussen_temperatur') | float(none) %}
+          {% set out_dp = states('sensor.aussen_taupunkt') | float(none) %}
           {% set ns = namespace(risk=0, lueften=0, heizen=0, stoss=0) %}
           {% if out_dp is not none and out_t is not none %}
             {% for name, eid in rooms %}
@@ -226,29 +353,29 @@ template:
             Heizen
           {% endif %}
         attributes:
-          outdoor_temperature: "{{ state_attr('weather.home', 'temperature') }}"
-          outdoor_humidity: "{{ state_attr('weather.home', 'humidity') }}"
-          outdoor_dew_point: "{{ state_attr('weather.home', 'dew_point') }}"
+          outdoor_temperature: "{{ states('sensor.aussen_temperatur') }}"
+          outdoor_humidity: "{{ states('sensor.aussen_feuchtigkeit') }}"
+          outdoor_dew_point: "{{ states('sensor.aussen_taupunkt') }}"
           summary: >
-            {% set out_t = state_attr('weather.home', 'temperature') | float(none) %}
-            {% set out_rh = state_attr('weather.home', 'humidity') | float(none) %}
-            {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+            {% set out_t = states('sensor.aussen_temperatur') | float(none) %}
+            {% set out_rh = states('sensor.aussen_feuchtigkeit') | float(none) %}
+            {% set out_dp = states('sensor.aussen_taupunkt') | float(none) %}
             {% if out_t is not none and out_rh is not none and out_dp is not none %}
-              Außen {{ out_t | round(1) }} °C · {{ out_rh | round(0) }} % · Taupunkt {{ out_dp | round(1) }} °C
+              Außen {{ out_t | round(1) }} °C (ETA) · {{ out_rh | round(0) }} % (Terrasse) · Taupunkt {{ out_dp | round(1) }} °C
             {% else %}
               Außendaten nicht verfügbar
             {% endif %}
           detail: >
             {% set rooms = [
-              ('Büro', 'sensor.buro_buro_schimmelpilzrisiko'),
+              ('Büro', 'sensor.schimmel_risiko_buero'),
               ('Wohnzimmer', 'sensor.schimmel_risiko_wohnen'),
               ('Schlafen C', 'sensor.schimmel_risiko_schlafen_c'),
-              ('Schlafzimmer', 'sensor.schlafzimmer_schlafzimmer_schimmelpilzrisiko'),
-              ('Bad', 'sensor.bad_bad_schimmelpilzrisiko'),
+              ('Schlafzimmer', 'sensor.schimmel_risiko_schlafzimmer'),
+              ('Bad', 'sensor.schimmel_risiko_bad'),
               ('Spielzimmer', 'sensor.spielzimmer_spielzimmer_schimmelpilzrisiko'),
             ] %}
-            {% set out_t = state_attr('weather.home', 'temperature') | float(none) %}
-            {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+            {% set out_t = states('sensor.aussen_temperatur') | float(none) %}
+            {% set out_dp = states('sensor.aussen_taupunkt') | float(none) %}
             {% set ns = namespace(risk=0, lines=[]) %}
             {% if out_dp is not none and out_t is not none %}
               {% for name, eid in rooms %}
@@ -287,15 +414,15 @@ template:
             {% endif %}
           rooms_ventilate: >
             {% set rooms = [
-              ('Büro', 'sensor.buro_buro_schimmelpilzrisiko'),
+              ('Büro', 'sensor.schimmel_risiko_buero'),
               ('Wohnzimmer', 'sensor.schimmel_risiko_wohnen'),
               ('Schlafen C', 'sensor.schimmel_risiko_schlafen_c'),
-              ('Schlafzimmer', 'sensor.schlafzimmer_schlafzimmer_schimmelpilzrisiko'),
-              ('Bad', 'sensor.bad_bad_schimmelpilzrisiko'),
+              ('Schlafzimmer', 'sensor.schimmel_risiko_schlafzimmer'),
+              ('Bad', 'sensor.schimmel_risiko_bad'),
               ('Spielzimmer', 'sensor.spielzimmer_spielzimmer_schimmelpilzrisiko'),
             ] %}
-            {% set out_t = state_attr('weather.home', 'temperature') | float(none) %}
-            {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+            {% set out_t = states('sensor.aussen_temperatur') | float(none) %}
+            {% set out_dp = states('sensor.aussen_taupunkt') | float(none) %}
             {% set ns = namespace(names=[]) %}
             {% if out_dp is not none and out_t is not none %}
               {% for name, eid in rooms %}
@@ -315,15 +442,15 @@ template:
             {{ ns.names | join(', ') }}
           rooms_heat: >
             {% set rooms = [
-              ('Büro', 'sensor.buro_buro_schimmelpilzrisiko'),
+              ('Büro', 'sensor.schimmel_risiko_buero'),
               ('Wohnzimmer', 'sensor.schimmel_risiko_wohnen'),
               ('Schlafen C', 'sensor.schimmel_risiko_schlafen_c'),
-              ('Schlafzimmer', 'sensor.schlafzimmer_schlafzimmer_schimmelpilzrisiko'),
-              ('Bad', 'sensor.bad_bad_schimmelpilzrisiko'),
+              ('Schlafzimmer', 'sensor.schimmel_risiko_schlafzimmer'),
+              ('Bad', 'sensor.schimmel_risiko_bad'),
               ('Spielzimmer', 'sensor.spielzimmer_spielzimmer_schimmelpilzrisiko'),
             ] %}
-            {% set out_t = state_attr('weather.home', 'temperature') | float(none) %}
-            {% set out_dp = state_attr('weather.home', 'dew_point') | float(none) %}
+            {% set out_t = states('sensor.aussen_temperatur') | float(none) %}
+            {% set out_dp = states('sensor.aussen_taupunkt') | float(none) %}
             {% set ns = namespace(names=[]) %}
             {% if out_dp is not none and out_t is not none %}
               {% for name, eid in rooms %}
