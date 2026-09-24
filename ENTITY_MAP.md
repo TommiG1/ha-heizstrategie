@@ -34,6 +34,9 @@ Power / idle (outdoor units):
 | Playroom | `climate.spielzimmer` |
 | Bedroom tado | `climate.schlafzimmer` |
 | Living tado | `climate.wohnzimmer` |
+| Kitchen tado (optional Raum-Ist) | `sensor.kuche_temperatur` / `climate.kuche` — derzeit oft unavailable; Fallback `sensor.wohnzimmer_wohnzimmer_temperatur` |
+| Wohnen Raum-Ist (Strategie) | `sensor.heizung_raum_ist_wohnen` |
+| Wohnen MelCloud Gerät-Soll | `sensor.heizung_klima_geraet_soll_wohnen` |
 
 ## Windows / doors
 

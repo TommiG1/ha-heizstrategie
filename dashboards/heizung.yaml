@@ -473,6 +473,17 @@ views:
           - input_number.heizung_tado_halten_c
           - input_number.heizung_klima_idle_w
           - input_number.heizung_klima_idle_min
+          - input_number.heizung_klima_reassert_min
+          - input_number.heizung_klima_watchdog_min
+          - input_number.heizung_klima_watchdog_delta_k
+          - input_number.heizung_klima_hard_cd_min
+          - input_number.heizung_klima_stagger_s
+          - sensor.heizung_raum_ist_wohnen
+          - sensor.heizung_klima_offset_wohnen
+          - sensor.heizung_klima_geraet_soll_wohnen
+          - input_number.heizung_klima_offset_min_k
+          - input_number.heizung_klima_offset_max_k
+          - input_number.heizung_klima_offset_step_k
           - input_number.heizung_nacht_aussen_c
           - input_number.heizung_nacht_aussen_aus_c
           - input_number.heizung_fenster_auf_min

@@ -243,6 +243,91 @@ template:
           {% if is_state('binary_sensor.schimmel_heizen_aktiv_wohnen', 'on') %}
             {{ boost if effektiv == 'off' else [effektiv | float(0), boost] | max }}
           {% else %}{{ effektiv }}{% endif %}
+      - name: Heizung Raum Ist Wohnen
+        unique_id: heizung_raum_ist_wohnen
+        default_entity_id: sensor.heizung_raum_ist_wohnen
+        device_class: temperature
+        unit_of_measurement: "°C"
+        state_class: measurement
+        icon: mdi:thermometer
+        state: >-
+          {% set kuche = states('sensor.kuche_temperatur') %}
+          {% if is_number(kuche) %}
+            {{ kuche | float | round(1) }}
+          {% elif state_attr('climate.kuche', 'current_temperature') is number %}
+            {{ state_attr('climate.kuche', 'current_temperature') | float | round(1) }}
+          {% elif is_number(states('sensor.wohnzimmer_wohnzimmer_temperatur')) %}
+            {{ states('sensor.wohnzimmer_wohnzimmer_temperatur') | float | round(1) }}
+          {% elif state_attr('climate.wohnzimmer', 'current_temperature') is number %}
+            {{ state_attr('climate.wohnzimmer', 'current_temperature') | float | round(1) }}
+          {% elif is_number(states('sensor.wohnzimmer_temperatur_2')) %}
+            {{ states('sensor.wohnzimmer_temperatur_2') | float | round(1) }}
+          {% else %}unavailable{% endif %}
+        attributes:
+          quelle: >-
+            {% set kuche = states('sensor.kuche_temperatur') %}
+            {% if is_number(kuche) %}tado_kueche
+            {% elif state_attr('climate.kuche', 'current_temperature') is number %}tado_kueche_climate
+            {% elif is_number(states('sensor.wohnzimmer_wohnzimmer_temperatur')) %}tado_wohnzimmer
+            {% elif state_attr('climate.wohnzimmer', 'current_temperature') is number %}tado_wohnzimmer_climate
+            {% elif is_number(states('sensor.wohnzimmer_temperatur_2')) %}netatmo
+            {% else %}none{% endif %}
+      - name: Heizung Klima Offset Wohnen
+        unique_id: heizung_klima_offset_wohnen
+        default_entity_id: sensor.heizung_klima_offset_wohnen
+        unit_of_measurement: "K"
+        state_class: measurement
+        icon: mdi:delta
+        state: >-
+          {% set raum = states('sensor.heizung_raum_ist_wohnen') %}
+          {% set min_o = states('input_number.heizung_klima_offset_min_k') | float(0.5) %}
+          {% set max_o = states('input_number.heizung_klima_offset_max_k') | float(3) %}
+          {% if not is_number(raum) %}
+            {{ min_o }}
+          {% else %}
+            {% set t1 = state_attr('climate.wohnzimmer_2', 'current_temperature') %}
+            {% set t2 = state_attr('climate.esszimmer', 'current_temperature') %}
+            {% if t1 is number and t2 is number %}
+              {% set geraet = (t1 | float + t2 | float) / 2 %}
+            {% elif t1 is number %}
+              {% set geraet = t1 | float %}
+            {% elif t2 is number %}
+              {% set geraet = t2 | float %}
+            {% else %}
+              {% set geraet = none %}
+            {% endif %}
+            {% if geraet is none %}
+              {{ min_o }}
+            {% else %}
+              {% set raw = geraet - (raum | float) %}
+              {% if raw < 0 %}0
+              {% else %}{{ [[raw, max_o] | min, min_o] | max | round(1) }}{% endif %}
+            {% endif %}
+          {% endif %}
+        attributes:
+          melcloud_avg: >-
+            {% set t1 = state_attr('climate.wohnzimmer_2', 'current_temperature') %}
+            {% set t2 = state_attr('climate.esszimmer', 'current_temperature') %}
+            {% if t1 is number and t2 is number %}{{ ((t1 | float + t2 | float) / 2) | round(1) }}
+            {% elif t1 is number %}{{ t1 | float | round(1) }}
+            {% elif t2 is number %}{{ t2 | float | round(1) }}
+            {% else %}unknown{% endif %}
+          raum_ist: "{{ states('sensor.heizung_raum_ist_wohnen') }}"
+      - name: Heizung Klima Gerät Soll Wohnen
+        unique_id: heizung_klima_geraet_soll_wohnen
+        default_entity_id: sensor.heizung_klima_geraet_soll_wohnen
+        icon: mdi:thermostat
+        state: >-
+          {% set soll = states('sensor.heizung_soll_wohnen') %}
+          {% if soll in ['off', 'unknown', 'unavailable', ''] %}
+            {{ soll if soll != '' else 'off' }}
+          {% else %}
+            {% set off = states('sensor.heizung_klima_offset_wohnen') | float(0.5) %}
+            {% set step = states('input_number.heizung_klima_offset_step_k') | float(0.5) %}
+            {% set raw = (soll | float) + off %}
+            {% set rounded = ((raw / step) | round(0) * step) | float %}
+            {{ [10.0, [rounded, 31.0] | min] | max }}
+          {% endif %}
       - name: Heizung Soll Büro
         unique_id: heizung_soll_buero
         default_entity_id: sensor.heizung_soll_buero
